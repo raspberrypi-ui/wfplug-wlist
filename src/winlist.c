@@ -112,8 +112,17 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     WindowItem *win = (WindowItem *) userdata;
     
     menu = gtk_menu_new ();
-    item = gtk_menu_item_new_with_label (_("Close"));
-    g_signal_connect (item, "activate", G_CALLBACK (close_app), win->handle);
+
+    if (win->state & STATE_MINIMISED)
+    {
+        item = gtk_menu_item_new_with_label (_("Unminimise"));
+        g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), win->handle);
+    }
+    else
+    {
+        item = gtk_menu_item_new_with_label (_("Minimise"));
+        g_signal_connect (item, "activate", G_CALLBACK (minimise_app), win->handle);
+    }
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
     if (win->state & STATE_MAXIMISED)
@@ -128,16 +137,8 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     }
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-    if (win->state & STATE_MINIMISED)
-    {
-        item = gtk_menu_item_new_with_label (_("Unminimise"));
-        g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), win->handle);
-    }
-    else
-    {
-        item = gtk_menu_item_new_with_label (_("Minimise"));
-        g_signal_connect (item, "activate", G_CALLBACK (minimise_app), win->handle);
-    }
+    item = gtk_menu_item_new_with_label (_("Close"));
+    g_signal_connect (item, "activate", G_CALLBACK (close_app), win->handle);
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
     gtk_widget_show_all (menu);
@@ -156,18 +157,111 @@ static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event,
 
     return TRUE;
 }
+#if 0
+
+    Glib::ustring shorten_title(int show_chars)
+    {
+        if (show_chars == 0)
+        {
+            return "";
+        }
+
+        int title_len = title.length();
+        Glib::ustring short_title = title.substr(0, show_chars);
+        if (title_len - show_chars >= 2)
+        {
+            short_title += "..";
+        } else if (title_len != show_chars)
+        {
+            short_title += ".";
+        }
+
+        return short_title;
+    }
+
+    int get_button_preferred_width()
+    {
+        int min_width, preferred_width;
+        button.get_preferred_width(min_width, preferred_width);
+
+        return preferred_width;
+    }
+
+    void set_max_width(int width)
+    {
+        this->max_width = width;
+        if (max_width == 0)
+        {
+            this->button.set_size_request(-1, -1);
+            this->label.set_label(title);
+            return;
+        }
+
+        this->button.set_size_request(width, -1);
+
+        int show_chars = 0;
+        for (show_chars = title.length(); show_chars > 0; show_chars--)
+        {
+            this->label.set_text(shorten_title(show_chars));
+            if (get_button_preferred_width() <= max_width)
+            {
+                break;
+            }
+        }
+
+        label.set_text(shorten_title(show_chars));
+    }
+#endif
+
+
+
+static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
+{
+    GtkWidget *icon, *label, *box;
+    char *str;
+    GAppInfo *info;
+    GIcon *ic;
+
+    str = g_strdup_printf ("%s.desktop", item->app_id);
+    info = (GAppInfo *) g_desktop_app_info_new (str);
+    ic = g_app_info_get_icon (info);
+    g_free (str);
+
+    str = g_icon_to_string (ic);
+    icon = gtk_image_new ();
+    wrap_set_taskbar_icon (wl, icon, str);
+    g_free (str);
+
+    if (wl->icons_only) gtk_container_add (GTK_CONTAINER (item->btn), icon);
+    else
+    {
+        label = gtk_label_new (item->title);
+
+        box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
+        gtk_container_add (GTK_CONTAINER (box), icon);
+        gtk_container_add (GTK_CONTAINER (box), label);
+        gtk_container_add (GTK_CONTAINER (item->btn), box);
+    }
+    gtk_widget_show_all (item->btn);
+    if (item->title) gtk_widget_set_tooltip_text (item->btn, item->title);
+}
 
 static void handle_toplevel_title (void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *list = wl->windows;
+    GList *child, *list = wl->windows;
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
             item->title = g_strdup (title);
-            if (item->btn) gtk_widget_set_tooltip_text (item->btn, item->title);
+            if (item->btn)
+            {
+                child = gtk_container_get_children (GTK_CONTAINER (item->btn));
+                gtk_widget_destroy (child->data);
+                set_icon_and_title (wl, item);
+            }
             break;
         }
         list = g_list_next (list);
@@ -185,35 +279,12 @@ static void handle_toplevel_app_id (void *data, struct zwlr_foreign_toplevel_han
         if (item->handle == (void *) handle)
         {
             item->app_id = g_strdup (app_id);
-
-            str = g_strdup_printf ("%s.desktop", app_id);
-            GAppInfo *info = (GAppInfo *) g_desktop_app_info_new (str);
-
             item->btn = gtk_toggle_button_new ();
-            if (item->title) gtk_widget_set_tooltip_text (item->btn, item->title);
             g_signal_connect (item->btn, "clicked", G_CALLBACK (activate_app), handle);
             g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
-            g_free (str);
-
-            GIcon *ic = g_app_info_get_icon (info);
-            
-            str = g_icon_to_string (ic);
-            GtkWidget *icon = gtk_image_new ();
-            wrap_set_taskbar_icon (wl, icon, str);
-            g_free (str);
-
-            if (wl->icons_only) gtk_container_add (GTK_CONTAINER (item->btn), icon);
-            else
-            {
-                GtkWidget *box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
-                gtk_container_add (GTK_CONTAINER (item->btn), box);
-                gtk_container_add (GTK_CONTAINER (box), icon);
-                GtkWidget *label = gtk_label_new (item->title);
-                gtk_container_add (GTK_CONTAINER (box), label);
-            }
+            set_icon_and_title (wl, item);
             gtk_container_add (GTK_CONTAINER (wl->plugin), item->btn);
             gtk_widget_show_all (wl->plugin);
-            
             break;
         }
         list = g_list_next (list);
@@ -351,37 +422,16 @@ static struct wl_registry_listener registry_listener =
 
 static void update_icons (WinlistPlugin *wl)
 {
-    GList *list = wl->windows;
+    GList *child, *list = wl->windows;
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
         if (item->btn)
         {
-            char *str = g_strdup_printf ("%s.desktop", item->app_id);
-            GAppInfo *info = (GAppInfo *) g_desktop_app_info_new (str);
-            g_free (str);
-
-            GIcon *ic = g_app_info_get_icon (info);
-
-            str = g_icon_to_string (ic);
-            GtkWidget *icon = gtk_image_new ();
-            wrap_set_taskbar_icon (wl, icon, str);
-            g_free (str);
-            gtk_widget_show (icon);
-            GList *child = gtk_container_get_children (GTK_CONTAINER (item->btn));
+            child = gtk_container_get_children (GTK_CONTAINER (item->btn));
             gtk_widget_destroy (child->data);
-
-            if (wl->icons_only) gtk_container_add (GTK_CONTAINER (item->btn), icon);
-            else
-            {
-                GtkWidget *box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
-                gtk_container_add (GTK_CONTAINER (item->btn), box);
-                gtk_container_add (GTK_CONTAINER (box), icon);
-                GtkWidget *label = gtk_label_new (item->title);
-                gtk_container_add (GTK_CONTAINER (box), label);
-                gtk_widget_show_all (box);
-            }
+            set_icon_and_title (wl, item);
         }
         list = g_list_next (list);
     }
