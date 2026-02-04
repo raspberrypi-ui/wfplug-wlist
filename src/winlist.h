@@ -34,6 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define PLUGIN_TITLE N_("Winlist")
 
+#define STATE_ACTIVATED 0x01
+#define STATE_MAXIMISED 0x02
+#define STATE_MINIMISED 0x04
+
 typedef struct 
 {
     GtkWidget *plugin;
@@ -53,6 +57,7 @@ typedef struct
     void *handle;
     char *app_id;
     char *title;
+    int state;
     GtkWidget *btn;
 } WindowItem;
 

@@ -55,6 +55,21 @@ conf_table_t conf_table[2] = {
 /* Function definitions                                                       */
 /*----------------------------------------------------------------------------*/
 
+static int get_state (WinlistPlugin *wl, struct zwlr_foreign_toplevel_handle_v1 *handle)
+{
+    GList *list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            return item->state;
+        }
+        list = g_list_next (list);
+    }
+    return 0;
+}
+
 static void activate_app (GtkWidget *, gpointer userdata)
 {
     GdkDisplay *gdk_display = gdk_display_get_default ();
@@ -69,20 +84,71 @@ static void close_app (GtkWidget *, gpointer userdata)
     zwlr_foreign_toplevel_handle_v1_close ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
 }
 
-static gboolean popup_menu (GtkWidget *widget, GdkEventButton *event, gpointer userdata)
+static void maximise_app (GtkWidget *, gpointer userdata)
+{
+    zwlr_foreign_toplevel_handle_v1_set_maximized ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+}
+
+static void unmaximise_app (GtkWidget *, gpointer userdata)
+{
+    zwlr_foreign_toplevel_handle_v1_unset_maximized ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+}
+
+static void minimise_app (GtkWidget *, gpointer userdata)
+{
+    zwlr_foreign_toplevel_handle_v1_set_minimized ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+}
+
+static void unminimise_app (GtkWidget *, gpointer userdata)
+{
+    zwlr_foreign_toplevel_handle_v1_unset_minimized ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+}
+
+static void popup_menu (GtkWidget *widget, gpointer userdata)
 {
     GtkWidget *menu, *item;
+    WindowItem *win = (WindowItem *) userdata;
     
+    menu = gtk_menu_new ();
+    item = gtk_menu_item_new_with_label (_("Close"));
+    g_signal_connect (item, "activate", G_CALLBACK (close_app), win->handle);
+    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+
+    if (win->state & STATE_MAXIMISED)
+    {
+        item = gtk_menu_item_new_with_label (_("Unmaximise"));
+        g_signal_connect (item, "activate", G_CALLBACK (unmaximise_app), win->handle);
+    }
+    else
+    {
+        item = gtk_menu_item_new_with_label (_("Maximise"));
+        g_signal_connect (item, "activate", G_CALLBACK (maximise_app), win->handle);
+    }
+    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+
+    if (win->state & STATE_MINIMISED)
+    {
+        item = gtk_menu_item_new_with_label (_("Unminimise"));
+        g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), win->handle);
+    }
+    else
+    {
+        item = gtk_menu_item_new_with_label (_("Minimise"));
+        g_signal_connect (item, "activate", G_CALLBACK (minimise_app), win->handle);
+    }
+    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+
+    gtk_widget_show_all (menu);
+    gtk_menu_popup_at_widget (GTK_MENU (menu), widget, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST, NULL);
+}
+
+static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata)
+{
     switch (event->button)
     {
         case 1 :    return FALSE;
 
-        case 3:     menu = gtk_menu_new ();
-                    item = gtk_menu_item_new_with_label (_("Close"));
-                    g_signal_connect (item, "activate", G_CALLBACK (close_app), userdata);
-                    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
-                    gtk_widget_show_all (menu);
-                    gtk_menu_popup_at_widget (GTK_MENU (menu), widget, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST, NULL);
+        case 3:     popup_menu (widget, userdata);
                     break;
     }
 
@@ -124,7 +190,7 @@ static void handle_toplevel_app_id (void *data, struct zwlr_foreign_toplevel_han
             item->btn = gtk_button_new ();
             if (item->title) gtk_widget_set_tooltip_text (item->btn, item->title);
             g_signal_connect (item->btn, "clicked", G_CALLBACK (activate_app), handle);
-            g_signal_connect (item->btn, "button-release-event", G_CALLBACK (popup_menu), handle);
+            g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
             g_free (str);
 
             GIcon *ic = g_app_info_get_icon (info);
@@ -152,8 +218,35 @@ static void handle_toplevel_output_leave (void *data, struct zwlr_foreign_toplev
 {
 }
 
-static void handle_toplevel_state (void *data, struct zwlr_foreign_toplevel_handle_v1 *, struct wl_array *state)
+static void handle_toplevel_state (void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_array *state)
 {
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    int flags = 0;
+    uint32_t *item;
+
+    wl_array_for_each (item, state)
+    {
+        if (*item == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED)
+            flags |= STATE_ACTIVATED;
+
+        if (*item == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED)
+            flags |= STATE_MAXIMISED;
+
+        if (*item == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED)
+            flags |= STATE_MINIMISED;
+    }
+
+    GList *list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            item->state = flags;
+            break;
+        }
+        list = g_list_next (list);
+    }
 }
 
 static void handle_toplevel_done (void *data, struct zwlr_foreign_toplevel_handle_v1 *)
