@@ -157,63 +157,6 @@ static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event,
 
     return TRUE;
 }
-#if 0
-
-    Glib::ustring shorten_title(int show_chars)
-    {
-        if (show_chars == 0)
-        {
-            return "";
-        }
-
-        int title_len = title.length();
-        Glib::ustring short_title = title.substr(0, show_chars);
-        if (title_len - show_chars >= 2)
-        {
-            short_title += "..";
-        } else if (title_len != show_chars)
-        {
-            short_title += ".";
-        }
-
-        return short_title;
-    }
-
-    int get_button_preferred_width()
-    {
-        int min_width, preferred_width;
-        button.get_preferred_width(min_width, preferred_width);
-
-        return preferred_width;
-    }
-
-    void set_max_width(int width)
-    {
-        this->max_width = width;
-        if (max_width == 0)
-        {
-            this->button.set_size_request(-1, -1);
-            this->label.set_label(title);
-            return;
-        }
-
-        this->button.set_size_request(width, -1);
-
-        int show_chars = 0;
-        for (show_chars = title.length(); show_chars > 0; show_chars--)
-        {
-            this->label.set_text(shorten_title(show_chars));
-            if (get_button_preferred_width() <= max_width)
-            {
-                break;
-            }
-        }
-
-        label.set_text(shorten_title(show_chars));
-    }
-#endif
-
-
 
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
 {
@@ -221,6 +164,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
     char *str;
     GAppInfo *info;
     GIcon *ic;
+    int tlen, p, m;
 
     str = g_strdup_printf ("%s.desktop", item->app_id);
     info = (GAppInfo *) g_desktop_app_info_new (str);
@@ -241,6 +185,28 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
         gtk_container_add (GTK_CONTAINER (box), icon);
         gtk_container_add (GTK_CONTAINER (box), label);
         gtk_container_add (GTK_CONTAINER (item->btn), box);
+
+        gtk_widget_set_size_request (item->btn, wl->max_width, -1);
+
+        gtk_widget_show_all (box);
+
+        if (item->title)
+        {
+            str = g_strdup (item->title);
+            for (tlen = strlen (item->title); tlen > 0; tlen--)
+            {
+                if (tlen < strlen (item->title))
+                {
+                    str[tlen - 3] = '.';
+                    str[tlen - 2] = '.';
+                    str[tlen - 1] = '.';
+                }
+                str[tlen] = 0;
+                gtk_label_set_text (GTK_LABEL (label), str);
+                gtk_widget_get_preferred_width (item->btn, &m, &p);
+                if (p <= wl->max_width) break;
+            }
+        }
     }
     gtk_widget_show_all (item->btn);
     if (item->title) gtk_widget_set_tooltip_text (item->btn, item->title);
