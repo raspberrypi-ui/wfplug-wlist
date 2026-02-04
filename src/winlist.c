@@ -42,9 +42,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* Global data                                                                */
 /*----------------------------------------------------------------------------*/
 
-conf_table_t conf_table[2] = {
-    {CONF_TYPE_INT,     "spacing",  N_("Icon spacing"), NULL},
-    {CONF_TYPE_NONE,    NULL,       NULL,               NULL}
+conf_table_t conf_table[4] = {
+    {CONF_TYPE_INT,     "spacing",      N_("Icon spacing"),     NULL},
+    {CONF_TYPE_INT,     "max_width",    N_("Max item width"),   NULL},
+    {CONF_TYPE_BOOL,    "icons_only",   N_("Show only icons"),  NULL},
+    {CONF_TYPE_NONE,    NULL,           NULL,                   NULL}
 };
 
 /*----------------------------------------------------------------------------*/
@@ -200,7 +202,15 @@ static void handle_toplevel_app_id (void *data, struct zwlr_foreign_toplevel_han
             wrap_set_taskbar_icon (wl, icon, str);
             g_free (str);
 
-            gtk_container_add (GTK_CONTAINER (item->btn), icon);
+            if (wl->icons_only) gtk_container_add (GTK_CONTAINER (item->btn), icon);
+            else
+            {
+                GtkWidget *box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
+                gtk_container_add (GTK_CONTAINER (item->btn), box);
+                gtk_container_add (GTK_CONTAINER (box), icon);
+                GtkWidget *label = gtk_label_new (item->title);
+                gtk_container_add (GTK_CONTAINER (box), label);
+            }
             gtk_container_add (GTK_CONTAINER (wl->plugin), item->btn);
             gtk_widget_show_all (wl->plugin);
             
@@ -353,7 +363,7 @@ static void update_icons (WinlistPlugin *wl)
             g_free (str);
 
             GIcon *ic = g_app_info_get_icon (info);
-            
+
             str = g_icon_to_string (ic);
             GtkWidget *icon = gtk_image_new ();
             wrap_set_taskbar_icon (wl, icon, str);
@@ -362,7 +372,16 @@ static void update_icons (WinlistPlugin *wl)
             GList *child = gtk_container_get_children (GTK_CONTAINER (item->btn));
             gtk_widget_destroy (child->data);
 
-            gtk_container_add (GTK_CONTAINER (item->btn), icon);
+            if (wl->icons_only) gtk_container_add (GTK_CONTAINER (item->btn), icon);
+            else
+            {
+                GtkWidget *box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
+                gtk_container_add (GTK_CONTAINER (item->btn), box);
+                gtk_container_add (GTK_CONTAINER (box), icon);
+                GtkWidget *label = gtk_label_new (item->title);
+                gtk_container_add (GTK_CONTAINER (box), label);
+                gtk_widget_show_all (box);
+            }
         }
         list = g_list_next (list);
     }

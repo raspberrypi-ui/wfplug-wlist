@@ -48,6 +48,8 @@ typedef struct
 #endif
 
     int spacing;                    /* Box icon spacing */
+    int max_width;
+    gboolean icons_only;
     struct zwlr_foreign_toplevel_manager_v1 *manager;
     GList *windows;
 } WinlistPlugin;
@@ -61,7 +63,7 @@ typedef struct
     GtkWidget *btn;
 } WindowItem;
 
-extern conf_table_t conf_table[2];
+extern conf_table_t conf_table[4];
 
 /*----------------------------------------------------------------------------*/
 /* Prototypes                                                                 */
