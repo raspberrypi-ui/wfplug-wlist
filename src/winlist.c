@@ -187,7 +187,7 @@ static void handle_toplevel_app_id (void *data, struct zwlr_foreign_toplevel_han
             str = g_strdup_printf ("%s.desktop", app_id);
             GAppInfo *info = (GAppInfo *) g_desktop_app_info_new (str);
 
-            item->btn = gtk_button_new ();
+            item->btn = gtk_toggle_button_new ();
             if (item->title) gtk_widget_set_tooltip_text (item->btn, item->title);
             g_signal_connect (item->btn, "clicked", G_CALLBACK (activate_app), handle);
             g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
@@ -222,29 +222,39 @@ static void handle_toplevel_state (void *data, struct zwlr_foreign_toplevel_hand
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
     int flags = 0;
-    uint32_t *item;
+    uint32_t *arr;
+    WindowItem *item;
+    GList *list;
 
-    wl_array_for_each (item, state)
+    wl_array_for_each (arr, state)
     {
-        if (*item == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED)
+        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED)
             flags |= STATE_ACTIVATED;
 
-        if (*item == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED)
+        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED)
             flags |= STATE_MAXIMISED;
 
-        if (*item == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED)
+        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED)
             flags |= STATE_MINIMISED;
     }
 
-    GList *list = wl->windows;
+    list = wl->windows;
     while (list)
     {
-        WindowItem *item = (WindowItem *) list->data;
+        item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
             item->state = flags;
             break;
         }
+        list = g_list_next (list);
+    }
+
+    list = wl->windows;
+    while (list)
+    {
+        item = (WindowItem *) list->data;
+        gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
         list = g_list_next (list);
     }
 }
