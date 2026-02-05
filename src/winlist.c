@@ -38,6 +38,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* Typedefs and macros                                                        */
 /*----------------------------------------------------------------------------*/
 
+#define HANDLE_PTR struct zwlr_foreign_toplevel_handle_v1 *
+#define MANAGER_PTR struct zwlr_foreign_toplevel_manager_v1 *
+
 /*----------------------------------------------------------------------------*/
 /* Global data                                                                */
 /*----------------------------------------------------------------------------*/
@@ -53,8 +56,223 @@ conf_table_t conf_table[4] = {
 /* Prototypes                                                                 */
 /*----------------------------------------------------------------------------*/
 
+static int get_state (WinlistPlugin *wl, struct zwlr_foreign_toplevel_handle_v1 *handle);
+static void handle_button_clicked (GtkWidget *, gpointer userdata);
+static void close_app (GtkWidget *, gpointer userdata);
+static void maximise_app (GtkWidget *, gpointer userdata);
+static void unmaximise_app (GtkWidget *, gpointer userdata);
+static void minimise_app (GtkWidget *, gpointer userdata);
+static void unminimise_app (GtkWidget *, gpointer userdata);
+static void popup_menu (GtkWidget *widget, gpointer userdata);
+static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
+static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item);
+static void update_icons (WinlistPlugin *wl);
+
 /*----------------------------------------------------------------------------*/
-/* Function definitions                                                       */
+/* Wayland protocol interface                                                 */
+/*----------------------------------------------------------------------------*/
+
+static void handle_toplevel_title (void *data, HANDLE_PTR handle, const char *title)
+{
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    GList *child, *list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            item->title = g_strdup (title);
+            if (item->btn)
+            {
+                child = gtk_container_get_children (GTK_CONTAINER (item->btn));
+                gtk_widget_destroy (child->data);
+                set_icon_and_title (wl, item);
+            }
+            break;
+        }
+        list = g_list_next (list);
+    }
+}
+
+static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *app_id)
+{
+    char *str;
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    GList *list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle && !item->parent)
+        {
+            item->app_id = g_strdup (app_id);
+            item->btn = gtk_toggle_button_new ();
+            g_signal_connect (item->btn, "clicked", G_CALLBACK (handle_button_clicked), handle);
+            g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
+            set_icon_and_title (wl, item);
+            gtk_container_add (GTK_CONTAINER (wl->plugin), item->btn);
+            gtk_widget_show_all (wl->plugin);
+            break;
+        }
+        list = g_list_next (list);
+    }
+}
+
+static void handle_toplevel_parent (void *data, HANDLE_PTR handle, HANDLE_PTR parent)
+{
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    GList *child, *list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            item->parent = (void *) parent;
+            if (item->parent && item->btn)
+            {
+                gtk_widget_destroy (item->btn);
+                item->btn = NULL;
+            }
+            break;
+        }
+        list = g_list_next (list);
+    }
+}
+
+static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_array *state)
+{
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    int flags = 0;
+    uint32_t *arr;
+    WindowItem *item;
+    GList *list;
+
+    wl_array_for_each (arr, state)
+    {
+        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED)
+            flags |= STATE_ACTIVATED;
+
+        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED)
+            flags |= STATE_MAXIMISED;
+
+        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED)
+            flags |= STATE_MINIMISED;
+    }
+
+    list = wl->windows;
+    while (list)
+    {
+        item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            item->state = flags;
+            break;
+        }
+        list = g_list_next (list);
+    }
+
+    list = wl->windows;
+    while (list)
+    {
+        item = (WindowItem *) list->data;
+        if (item->btn)
+        {
+            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_clicked), item->handle);
+            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_release), item);
+            gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
+            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_clicked), item->handle);
+            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_release), item);
+        }
+        list = g_list_next (list);
+    }
+}
+
+static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
+{
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    GList *list = wl->windows;
+
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            if (item->btn) gtk_widget_destroy (item->btn);
+            g_free (item->title);
+            g_free (item->app_id);
+            wl->windows = g_list_delete_link (wl->windows, list);
+            break;
+        }
+        list = g_list_next (list);
+    }
+}
+
+static void handle_toplevel_done (void *data, HANDLE_PTR)
+{
+}
+
+static void handle_toplevel_output_enter (void *data, HANDLE_PTR, struct wl_output *output)
+{
+}
+
+static void handle_toplevel_output_leave (void *data, HANDLE_PTR, struct wl_output *output)
+{
+}
+
+struct zwlr_foreign_toplevel_handle_v1_listener toplevel_handle_v1 = 
+{
+    .title  = handle_toplevel_title,
+    .app_id = handle_toplevel_app_id,
+    .parent = handle_toplevel_parent,
+    .state  = handle_toplevel_state,
+    .done   = handle_toplevel_done,
+    .closed = handle_toplevel_closed,
+    .output_enter = handle_toplevel_output_enter,
+    .output_leave = handle_toplevel_output_leave
+};
+
+static void handle_manager_toplevel (void *data, MANAGER_PTR manager, HANDLE_PTR toplevel)
+{
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    WindowItem *item = g_new0 (WindowItem, 1);
+
+    item->handle = (void *) toplevel;
+    wl->windows = g_list_append (wl->windows, item);
+        
+    zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &toplevel_handle_v1, data);
+}
+
+static void handle_manager_finished (void *data, MANAGER_PTR manager)
+{
+}
+
+struct zwlr_foreign_toplevel_manager_v1_listener toplevel_manager_v1 = 
+{
+    .toplevel = handle_manager_toplevel,
+    .finished = handle_manager_finished,
+};
+
+static void registry_add_object (void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
+{
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+
+    if (!g_strcmp0 (interface, zwlr_foreign_toplevel_manager_v1_interface.name))
+    {
+        wl->manager = (MANAGER_PTR) wl_registry_bind (registry, name, &zwlr_foreign_toplevel_manager_v1_interface, version < 3 ? version : 3);
+    }
+}
+
+static void registry_remove_object (void *data, struct wl_registry *registry, uint32_t name)
+{
+}
+
+static struct wl_registry_listener registry_listener =
+{
+    &registry_add_object,
+    &registry_remove_object
+};
+
+/*----------------------------------------------------------------------------*/
+/*                                                  */
 /*----------------------------------------------------------------------------*/
 
 static int get_state (WinlistPlugin *wl, struct zwlr_foreign_toplevel_handle_v1 *handle)
@@ -72,38 +290,38 @@ static int get_state (WinlistPlugin *wl, struct zwlr_foreign_toplevel_handle_v1 
     return 0;
 }
 
-static void activate_app (GtkWidget *, gpointer userdata)
+static void handle_button_clicked (GtkWidget *, gpointer userdata)
 {
     GdkDisplay *gdk_display = gdk_display_get_default ();
     GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
     struct wl_seat *wseat  = gdk_wayland_seat_get_wl_seat (seat);
 
-    zwlr_foreign_toplevel_handle_v1_activate ((struct zwlr_foreign_toplevel_handle_v1 *) userdata, wseat);
+    zwlr_foreign_toplevel_handle_v1_activate ((HANDLE_PTR) userdata, wseat);
 }
 
 static void close_app (GtkWidget *, gpointer userdata)
 {
-    zwlr_foreign_toplevel_handle_v1_close ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+    zwlr_foreign_toplevel_handle_v1_close ((HANDLE_PTR) userdata);
 }
 
 static void maximise_app (GtkWidget *, gpointer userdata)
 {
-    zwlr_foreign_toplevel_handle_v1_set_maximized ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+    zwlr_foreign_toplevel_handle_v1_set_maximized ((HANDLE_PTR) userdata);
 }
 
 static void unmaximise_app (GtkWidget *, gpointer userdata)
 {
-    zwlr_foreign_toplevel_handle_v1_unset_maximized ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+    zwlr_foreign_toplevel_handle_v1_unset_maximized ((HANDLE_PTR) userdata);
 }
 
 static void minimise_app (GtkWidget *, gpointer userdata)
 {
-    zwlr_foreign_toplevel_handle_v1_set_minimized ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+    zwlr_foreign_toplevel_handle_v1_set_minimized ((HANDLE_PTR) userdata);
 }
 
 static void unminimise_app (GtkWidget *, gpointer userdata)
 {
-    zwlr_foreign_toplevel_handle_v1_unset_minimized ((struct zwlr_foreign_toplevel_handle_v1 *) userdata);
+    zwlr_foreign_toplevel_handle_v1_unset_minimized ((HANDLE_PTR) userdata);
 }
 
 static void popup_menu (GtkWidget *widget, gpointer userdata)
@@ -216,204 +434,6 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
     if (item->title) gtk_widget_set_tooltip_text (item->btn, item->title);
 }
 
-static void handle_toplevel_title (void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title)
-{
-    WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *child, *list = wl->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (item->handle == (void *) handle)
-        {
-            item->title = g_strdup (title);
-            if (item->btn)
-            {
-                child = gtk_container_get_children (GTK_CONTAINER (item->btn));
-                gtk_widget_destroy (child->data);
-                set_icon_and_title (wl, item);
-            }
-            break;
-        }
-        list = g_list_next (list);
-    }
-}
-
-static void handle_toplevel_app_id (void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *app_id)
-{
-    char *str;
-    WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *list = wl->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (item->handle == (void *) handle && !item->parent)
-        {
-            item->app_id = g_strdup (app_id);
-            item->btn = gtk_toggle_button_new ();
-            g_signal_connect (item->btn, "clicked", G_CALLBACK (activate_app), handle);
-            g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
-            set_icon_and_title (wl, item);
-            gtk_container_add (GTK_CONTAINER (wl->plugin), item->btn);
-            gtk_widget_show_all (wl->plugin);
-            break;
-        }
-        list = g_list_next (list);
-    }
-}
-
-static void handle_toplevel_output_enter (void *data, struct zwlr_foreign_toplevel_handle_v1 *, struct wl_output *output)
-{
-}
-
-static void handle_toplevel_output_leave (void *data, struct zwlr_foreign_toplevel_handle_v1 *, struct wl_output *output)
-{
-}
-
-static void handle_toplevel_state (void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_array *state)
-{
-    WinlistPlugin *wl = (WinlistPlugin*) data;
-    int flags = 0;
-    uint32_t *arr;
-    WindowItem *item;
-    GList *list;
-
-    wl_array_for_each (arr, state)
-    {
-        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED)
-            flags |= STATE_ACTIVATED;
-
-        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED)
-            flags |= STATE_MAXIMISED;
-
-        if (*arr == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED)
-            flags |= STATE_MINIMISED;
-    }
-
-    list = wl->windows;
-    while (list)
-    {
-        item = (WindowItem *) list->data;
-        if (item->handle == (void *) handle)
-        {
-            item->state = flags;
-            break;
-        }
-        list = g_list_next (list);
-    }
-
-    list = wl->windows;
-    while (list)
-    {
-        item = (WindowItem *) list->data;
-        if (item->btn)
-        {
-            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (activate_app), item->handle);
-            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_release), item);
-            gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
-            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (activate_app), item->handle);
-            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_release), item);
-        }
-        list = g_list_next (list);
-    }
-}
-
-static void handle_toplevel_done (void *data, struct zwlr_foreign_toplevel_handle_v1 *)
-{
-}
-
-static void handle_toplevel_closed (void *data, struct zwlr_foreign_toplevel_handle_v1 *handle)
-{
-    WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *list = wl->windows;
-
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (item->handle == (void *) handle)
-        {
-            if (item->btn) gtk_widget_destroy (item->btn);
-            g_free (item->title);
-            g_free (item->app_id);
-            wl->windows = g_list_delete_link (wl->windows, list);
-            break;
-        }
-        list = g_list_next (list);
-    }
-}
-
-static void handle_toplevel_parent (void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct zwlr_foreign_toplevel_handle_v1 *parent)
-{
-    WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *child, *list = wl->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (item->handle == (void *) handle)
-        {
-            item->parent = (void *) parent;
-            if (item->parent && item->btn)
-            {
-                gtk_widget_destroy (item->btn);
-                item->btn = NULL;
-            }
-            break;
-        }
-        list = g_list_next (list);
-    }
-}
-
-struct zwlr_foreign_toplevel_handle_v1_listener toplevel_handle_v1_impl = {
-    .title  = handle_toplevel_title,
-    .app_id = handle_toplevel_app_id,
-    .output_enter = handle_toplevel_output_enter,
-    .output_leave = handle_toplevel_output_leave,
-    .state  = handle_toplevel_state,
-    .done   = handle_toplevel_done,
-    .closed = handle_toplevel_closed,
-    .parent = handle_toplevel_parent
-};
-
-static void handle_manager_toplevel (void *data, struct zwlr_foreign_toplevel_manager_v1 *manager,
-    struct zwlr_foreign_toplevel_handle_v1 *toplevel)
-{
-    WinlistPlugin *wl = (WinlistPlugin*) data;
-    WindowItem *item = g_new0 (WindowItem, 1);
-
-    item->handle = (void *) toplevel;
-    wl->windows = g_list_append (wl->windows, item);
-        
-    zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &toplevel_handle_v1_impl, data);
-}
-
-static void handle_manager_finished (void *data, struct zwlr_foreign_toplevel_manager_v1 *manager)
-{}
-
-struct zwlr_foreign_toplevel_manager_v1_listener toplevel_manager_v1_impl = {
-    .toplevel = handle_manager_toplevel,
-    .finished = handle_manager_finished,
-};
-
-static void registry_add_object (void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
-{
-    WinlistPlugin *wl = (WinlistPlugin*) data;
-
-    if (!g_strcmp0 (interface, zwlr_foreign_toplevel_manager_v1_interface.name))
-    {
-        wl->manager = (struct zwlr_foreign_toplevel_manager_v1 *) wl_registry_bind (registry, name, &zwlr_foreign_toplevel_manager_v1_interface, version < 3 ? version : 3);
-    }
-}
-
-static void registry_remove_object (void *data, struct wl_registry *registry, uint32_t name)
-{
-}
-
-static struct wl_registry_listener registry_listener =
-{
-    &registry_add_object,
-    &registry_remove_object
-};
-
-
 static void update_icons (WinlistPlugin *wl)
 {
     GList *child, *list = wl->windows;
@@ -470,16 +490,9 @@ void wlist_init (WinlistPlugin *wl)
     struct wl_registry *registry = wl_display_get_registry (display);
     wl_registry_add_listener (registry, &registry_listener, wl);
     wl_display_roundtrip (display);
-
-    if (!wl->manager)
-    {
-        printf ("no manager\n");
-        wl_registry_destroy (registry);
-        return;
-    }
-
     wl_registry_destroy (registry);
-    zwlr_foreign_toplevel_manager_v1_add_listener (wl->manager, &toplevel_manager_v1_impl, wl);
+
+    if (wl->manager) zwlr_foreign_toplevel_manager_v1_add_listener (wl->manager, &toplevel_manager_v1, wl);
 }
 
 void wlist_destructor (gpointer user_data)
