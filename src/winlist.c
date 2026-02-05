@@ -474,6 +474,8 @@ static void update_icons (WinlistPlugin *wl)
 {
     GList *child, *list = wl->windows;
 
+    gtk_box_set_spacing (GTK_BOX (wl->plugin), wl->spacing);
+
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
@@ -510,7 +512,7 @@ void wlist_init (WinlistPlugin *wl)
     bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 
     /* Set up variables */
-    //gtk_box_set_spacing (GTK_BOX (lch->plugin), lch->spacing);
+    gtk_box_set_spacing (GTK_BOX (wl->plugin), wl->spacing);
 
     wl->windows = NULL;
 
