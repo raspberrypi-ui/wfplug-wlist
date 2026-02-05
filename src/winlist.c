@@ -168,10 +168,14 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
 
     str = g_strdup_printf ("%s.desktop", item->app_id);
     info = (GAppInfo *) g_desktop_app_info_new (str);
-    ic = g_app_info_get_icon (info);
-    g_free (str);
+    if (info)
+    {
+        ic = g_app_info_get_icon (info);
+        g_free (str);
+        str = g_icon_to_string (ic);
+    }
+    else str = g_strdup ("application-x-executable");
 
-    str = g_icon_to_string (ic);
     icon = gtk_image_new ();
     wrap_set_taskbar_icon (wl, icon, str);
     g_free (str);
@@ -395,7 +399,7 @@ static void registry_add_object (void *data, struct wl_registry *registry, uint3
 
     if (!g_strcmp0 (interface, zwlr_foreign_toplevel_manager_v1_interface.name))
     {
-        wl->manager = (struct zwlr_foreign_toplevel_manager_v1*) wl_registry_bind (registry, name, &zwlr_foreign_toplevel_manager_v1_interface, version < 3 ? version : 3);
+        wl->manager = (struct zwlr_foreign_toplevel_manager_v1 *) wl_registry_bind (registry, name, &zwlr_foreign_toplevel_manager_v1_interface, version < 3 ? version : 3);
     }
 }
 
