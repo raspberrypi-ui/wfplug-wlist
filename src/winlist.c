@@ -434,7 +434,11 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
     wrap_set_taskbar_icon (wl, icon, str);
     g_free (str);
 
-    if (wl->icons_only) gtk_container_add (GTK_CONTAINER (item->btn), icon);
+    if (wl->icons_only)
+    {
+        gtk_container_add (GTK_CONTAINER (item->btn), icon);
+        gtk_widget_set_size_request (item->btn, -1, -1);
+    }
     else
     {
         label = gtk_label_new (item->title);
