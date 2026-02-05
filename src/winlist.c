@@ -242,7 +242,7 @@ static void handle_toplevel_app_id (void *data, struct zwlr_foreign_toplevel_han
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (item->handle == (void *) handle)
+        if (item->handle == (void *) handle && !item->parent)
         {
             item->app_id = g_strdup (app_id);
             item->btn = gtk_toggle_button_new ();
@@ -301,7 +301,14 @@ static void handle_toplevel_state (void *data, struct zwlr_foreign_toplevel_hand
     while (list)
     {
         item = (WindowItem *) list->data;
-        gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
+        if (item->btn)
+        {
+            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (activate_app), item->handle);
+            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_release), item);
+            gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
+            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (activate_app), item->handle);
+            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_release), item);
+        }
         list = g_list_next (list);
     }
 }
@@ -332,6 +339,23 @@ static void handle_toplevel_closed (void *data, struct zwlr_foreign_toplevel_han
 
 static void handle_toplevel_parent (void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct zwlr_foreign_toplevel_handle_v1 *parent)
 {
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    GList *child, *list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            item->parent = (void *) parent;
+            if (item->parent && item->btn)
+            {
+                gtk_widget_destroy (item->btn);
+                item->btn = NULL;
+            }
+            break;
+        }
+        list = g_list_next (list);
+    }
 }
 
 struct zwlr_foreign_toplevel_handle_v1_listener toplevel_handle_v1_impl = {

@@ -57,6 +57,7 @@ typedef struct
 typedef struct
 {
     void *handle;
+    void *parent;
     char *app_id;
     char *title;
     int state;
