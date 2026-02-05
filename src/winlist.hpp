@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <gtkmm/gesturelongpress.h>
 
 extern "C" {
+#include <menu-cache.h>
 #include "lxutils.h"
 #include "winlist.h"
 }

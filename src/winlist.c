@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <glib/gi18n.h>
 #include <gio/gdesktopappinfo.h>
 #include <gdk/gdkwayland.h>
+#include <menu-cache.h>
 
 #include "lxutils.h"
 
@@ -395,16 +396,39 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
     GIcon *ic;
     size_t tlen;
     int pref, min;
+    GSList *list, *iter;
+    MenuCacheItem *mitem;
 
     str = g_strdup_printf ("%s.desktop", item->app_id);
     info = (GAppInfo *) g_desktop_app_info_new (str);
+    g_free (str);
+
+    str = NULL;
     if (info)
     {
         ic = g_app_info_get_icon (info);
-        g_free (str);
         str = g_icon_to_string (ic);
     }
-    else str = g_strdup ("application-x-executable");
+    else
+    {
+        // the app-id doesn't directly match anything, so see if an ID in the menu cache list contains it
+        list = menu_cache_list_all_apps (wl->menu_cache);
+        iter = list;
+        while (iter)
+        {
+            mitem = (MenuCacheItem *) iter->data;
+            if (strcasestr (menu_cache_item_get_id (mitem), item->app_id))
+            {
+                str = g_strdup (menu_cache_item_get_icon (mitem));
+                break;
+            }
+            iter = iter->next;
+        }
+        g_slist_free_full (list, (GDestroyNotify) ((void *) menu_cache_item_unref));
+    }
+
+    // if we didn't find any matches, just use a default icon
+    if (!str) str = g_strdup ("application-x-executable");
 
     icon = gtk_image_new ();
     wrap_set_taskbar_icon (wl, icon, str);
@@ -489,6 +513,10 @@ void wlist_init (WinlistPlugin *wl)
     //gtk_box_set_spacing (GTK_BOX (lch->plugin), lch->spacing);
 
     wl->windows = NULL;
+
+    gboolean need_prefix = (g_getenv ("XDG_MENU_PREFIX") == NULL);
+    wl->menu_cache = menu_cache_lookup (need_prefix ? "lxde-applications.menu" : "applications.menu");
+    menu_cache_add_reload_notify (wl->menu_cache, NULL, NULL);
 
     GdkDisplay *gdk_display = gdk_display_get_default ();
     struct wl_display *display = gdk_wayland_display_get_wl_display (gdk_display);

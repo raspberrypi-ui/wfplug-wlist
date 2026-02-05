@@ -1,12 +1,13 @@
 gtkmm = dependency('gtkmm-3.0', version: '>=3.24')
 wfpanel = dependency('wf-panel-pi')
+menu_cache = dependency('libmenu-cache')
 
 wsources = files(
   'winlist.c',
   'winlist.cpp'
 )
 
-wdeps = [ deps, gtkmm, wfpanel ]
+wdeps = [ deps, gtkmm, wfpanel, menu_cache ]
 
 wargs = [ '-DPACKAGE_DATA_DIR="' + wresource_dir + '"', '-DGETTEXT_PACKAGE="wfplug_' + meson.project_name() +'"' ]
 

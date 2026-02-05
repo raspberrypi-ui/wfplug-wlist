@@ -41,18 +41,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef struct 
 {
     GtkWidget *plugin;
-    GtkGesture *gesture;
 
-#ifdef LXPLUG
-    LXPanel *panel;                 /* Back pointer to panel */
-    config_setting_t *settings;     /* Plugin settings */
-#endif
+    GList *windows;
 
-    int spacing;                    /* Box icon spacing */
+    int spacing;
     int max_width;
     gboolean icons_only;
+
     struct zwlr_foreign_toplevel_manager_v1 *manager;
-    GList *windows;
+    MenuCache* menu_cache;
 } WinlistPlugin;
 
 typedef struct
