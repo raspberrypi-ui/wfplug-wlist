@@ -56,7 +56,6 @@ conf_table_t conf_table[4] = {
 /* Prototypes                                                                 */
 /*----------------------------------------------------------------------------*/
 
-static int get_state (WinlistPlugin *wl, struct zwlr_foreign_toplevel_handle_v1 *handle);
 static void handle_button_clicked (GtkWidget *, gpointer userdata);
 static void close_app (GtkWidget *, gpointer userdata);
 static void maximise_app (GtkWidget *, gpointer userdata);
@@ -96,7 +95,6 @@ static void handle_toplevel_title (void *data, HANDLE_PTR handle, const char *ti
 
 static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *app_id)
 {
-    char *str;
     WinlistPlugin *wl = (WinlistPlugin*) data;
     GList *list = wl->windows;
     while (list)
@@ -120,7 +118,7 @@ static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *a
 static void handle_toplevel_parent (void *data, HANDLE_PTR handle, HANDLE_PTR parent)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *child, *list = wl->windows;
+    GList *list = wl->windows;
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
@@ -206,15 +204,15 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
     }
 }
 
-static void handle_toplevel_done (void *data, HANDLE_PTR)
+static void handle_toplevel_done (void *, HANDLE_PTR)
 {
 }
 
-static void handle_toplevel_output_enter (void *data, HANDLE_PTR, struct wl_output *output)
+static void handle_toplevel_output_enter (void *, HANDLE_PTR, struct wl_output *)
 {
 }
 
-static void handle_toplevel_output_leave (void *data, HANDLE_PTR, struct wl_output *output)
+static void handle_toplevel_output_leave (void *, HANDLE_PTR, struct wl_output *)
 {
 }
 
@@ -230,7 +228,7 @@ struct zwlr_foreign_toplevel_handle_v1_listener toplevel_handle_v1 =
     .output_leave = handle_toplevel_output_leave
 };
 
-static void handle_manager_toplevel (void *data, MANAGER_PTR manager, HANDLE_PTR toplevel)
+static void handle_manager_toplevel (void *data, MANAGER_PTR, HANDLE_PTR toplevel)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
     WindowItem *item = g_new0 (WindowItem, 1);
@@ -241,7 +239,7 @@ static void handle_manager_toplevel (void *data, MANAGER_PTR manager, HANDLE_PTR
     zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &toplevel_handle_v1, data);
 }
 
-static void handle_manager_finished (void *data, MANAGER_PTR manager)
+static void handle_manager_finished (void *, MANAGER_PTR)
 {
 }
 
@@ -261,7 +259,7 @@ static void registry_add_object (void *data, struct wl_registry *registry, uint3
     }
 }
 
-static void registry_remove_object (void *data, struct wl_registry *registry, uint32_t name)
+static void registry_remove_object (void *, struct wl_registry *, uint32_t)
 {
 }
 
@@ -274,21 +272,6 @@ static struct wl_registry_listener registry_listener =
 /*----------------------------------------------------------------------------*/
 /*                                                  */
 /*----------------------------------------------------------------------------*/
-
-static int get_state (WinlistPlugin *wl, struct zwlr_foreign_toplevel_handle_v1 *handle)
-{
-    GList *list = wl->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (item->handle == (void *) handle)
-        {
-            return item->state;
-        }
-        list = g_list_next (list);
-    }
-    return 0;
-}
 
 static void handle_button_clicked (GtkWidget *, gpointer userdata)
 {
@@ -382,7 +365,8 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
     char *str;
     GAppInfo *info;
     GIcon *ic;
-    int tlen, p, m;
+    size_t tlen;
+    int pref, min;
 
     str = g_strdup_printf ("%s.desktop", item->app_id);
     info = (GAppInfo *) g_desktop_app_info_new (str);
@@ -415,7 +399,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
         if (item->title)
         {
             str = g_strdup (item->title);
-            for (tlen = strlen (item->title); tlen > 0; tlen--)
+            for (tlen = strlen (str); tlen > 0; tlen--)
             {
                 if (tlen < strlen (item->title))
                 {
@@ -425,8 +409,8 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
                 }
                 str[tlen] = 0;
                 gtk_label_set_text (GTK_LABEL (label), str);
-                gtk_widget_get_preferred_width (item->btn, &m, &p);
-                if (p <= wl->max_width) break;
+                gtk_widget_get_preferred_width (item->btn, &min, &pref);
+                if (pref <= wl->max_width) break;
             }
         }
     }
@@ -456,7 +440,7 @@ static void update_icons (WinlistPlugin *wl)
 /*----------------------------------------------------------------------------*/
 
 /* Handler for button click */
-static void wlist_button_clicked (GtkWidget *, WinlistPlugin *wl)
+static void wlist_button_clicked (GtkWidget *, WinlistPlugin *)
 {
     CHECK_LONGPRESS
 }
@@ -468,7 +452,7 @@ void wlist_update_display (WinlistPlugin *wl)
 }
 
 /* Handler for control message */
-gboolean wlist_control_msg (WinlistPlugin *wl, const char *cmd)
+gboolean wlist_control_msg (WinlistPlugin *, const char *)
 {
     return FALSE;
 }
