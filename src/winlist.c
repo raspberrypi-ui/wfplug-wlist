@@ -56,15 +56,17 @@ conf_table_t conf_table[4] = {
 /* Prototypes                                                                 */
 /*----------------------------------------------------------------------------*/
 
-static void handle_button_clicked (GtkWidget *, gpointer userdata);
+static void activate_app (GtkWidget *, gpointer userdata);
 static void close_app (GtkWidget *, gpointer userdata);
 static void maximise_app (GtkWidget *, gpointer userdata);
 static void unmaximise_app (GtkWidget *, gpointer userdata);
 static void minimise_app (GtkWidget *, gpointer userdata);
 static void unminimise_app (GtkWidget *, gpointer userdata);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
+static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item);
+static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpointer userdata);
 static void update_icons (WinlistPlugin *wl);
 
 /*----------------------------------------------------------------------------*/
@@ -104,7 +106,8 @@ static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *a
         {
             item->app_id = g_strdup (app_id);
             item->btn = gtk_toggle_button_new ();
-            g_signal_connect (item->btn, "clicked", G_CALLBACK (handle_button_clicked), handle);
+            item->gesture = add_long_press (item->btn, G_CALLBACK (handle_gesture_end), item);
+            g_signal_connect (item->btn, "button-press-event", G_CALLBACK (handle_button_pressed), item);
             g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
             set_icon_and_title (wl, item);
             gtk_container_add (GTK_CONTAINER (wl->plugin), item->btn);
@@ -174,10 +177,10 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
         item = (WindowItem *) list->data;
         if (item->btn)
         {
-            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_clicked), item->handle);
+            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_pressed), item);
             g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_release), item);
             gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
-            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_clicked), item->handle);
+            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_pressed), item);
             g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_release), item);
         }
         list = g_list_next (list);
@@ -195,8 +198,9 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         if (item->handle == (void *) handle)
         {
             if (item->btn) gtk_widget_destroy (item->btn);
-            g_free (item->title);
-            g_free (item->app_id);
+            if (item->title) g_free (item->title);
+            if (item->app_id) g_free (item->app_id);
+            if (item->gesture) g_object_unref (item->gesture);
             wl->windows = g_list_delete_link (wl->windows, list);
             break;
         }
@@ -235,7 +239,6 @@ static void handle_manager_toplevel (void *data, MANAGER_PTR, HANDLE_PTR topleve
 
     item->handle = (void *) toplevel;
     wl->windows = g_list_append (wl->windows, item);
-        
     zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &toplevel_handle_v1, data);
 }
 
@@ -270,10 +273,10 @@ static struct wl_registry_listener registry_listener =
 };
 
 /*----------------------------------------------------------------------------*/
-/*                                                  */
+/* Window handle controls                                                     */
 /*----------------------------------------------------------------------------*/
 
-static void handle_button_clicked (GtkWidget *, gpointer userdata)
+static void activate_app (GtkWidget *, gpointer userdata)
 {
     GdkDisplay *gdk_display = gdk_display_get_default ();
     GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
@@ -306,6 +309,10 @@ static void unminimise_app (GtkWidget *, gpointer userdata)
 {
     zwlr_foreign_toplevel_handle_v1_unset_minimized ((HANDLE_PTR) userdata);
 }
+
+/*----------------------------------------------------------------------------*/
+/* Widget handlers                                                            */
+/*----------------------------------------------------------------------------*/
 
 static void popup_menu (GtkWidget *widget, gpointer userdata)
 {
@@ -346,17 +353,38 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     gtk_menu_popup_at_widget (GTK_MENU (menu), widget, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST, NULL);
 }
 
+static gboolean handle_button_pressed (GtkWidget *, GdkEventButton *, gpointer)
+{
+    pressed = PRESS_NONE;
+    return FALSE;
+}
+
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata)
 {
+    WindowItem *win = (WindowItem *) userdata;
+
+    if (pressed == PRESS_LONG) return FALSE;
+
     switch (event->button)
     {
-        case 1 :    return FALSE;
+        case 1:     activate_app (widget, win->handle);
+                    return TRUE;
 
         case 3:     popup_menu (widget, userdata);
-                    break;
+                    return TRUE;
     }
 
-    return TRUE;
+    return FALSE;
+}
+
+static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpointer userdata)
+{
+    WindowItem *item = (WindowItem *) userdata;
+
+    if (pressed == PRESS_LONG)
+    {
+        popup_menu (item->btn, userdata);
+    }
 }
 
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
@@ -439,12 +467,6 @@ static void update_icons (WinlistPlugin *wl)
 /* wf-panel plugin functions                                                  */
 /*----------------------------------------------------------------------------*/
 
-/* Handler for button click */
-static void wlist_button_clicked (GtkWidget *, WinlistPlugin *)
-{
-    CHECK_LONGPRESS
-}
-
 /* Handler for system config changed message from panel */
 void wlist_update_display (WinlistPlugin *wl)
 {
@@ -470,8 +492,8 @@ void wlist_init (WinlistPlugin *wl)
 
     GdkDisplay *gdk_display = gdk_display_get_default ();
     struct wl_display *display = gdk_wayland_display_get_wl_display (gdk_display);
-
     struct wl_registry *registry = wl_display_get_registry (display);
+
     wl_registry_add_listener (registry, &registry_listener, wl);
     wl_display_roundtrip (display);
     wl_registry_destroy (registry);

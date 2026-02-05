@@ -74,9 +74,6 @@ void WayfireWinlist::init (Gtk::HBox *container)
     wl->plugin = (GtkWidget *)((*plugin).gobj());
     icon_timer = Glib::signal_idle().connect (sigc::mem_fun (*this, &WayfireWinlist::set_icon));
 
-    /* Add long press for right click */
-    //gesture = add_longpress_default (*plugin);
-
     /* Initialise the plugin */
     read_settings ();
     wlist_init (wl);

@@ -41,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 typedef struct 
 {
     GtkWidget *plugin;
+    GtkGesture *gesture;
 
 #ifdef LXPLUG
     LXPanel *panel;                 /* Back pointer to panel */
@@ -62,6 +63,7 @@ typedef struct
     char *title;
     int state;
     GtkWidget *btn;
+    GtkGesture *gesture;
 } WindowItem;
 
 extern conf_table_t conf_table[4];

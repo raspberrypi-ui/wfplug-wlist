@@ -40,7 +40,6 @@ extern "C" {
 class WayfireWinlist : public WayfireWidget
 {
     std::unique_ptr <Gtk::HBox> plugin;
-    Glib::RefPtr<Gtk::GestureLongPress> gesture;
 
     sigc::connection icon_timer;
 
