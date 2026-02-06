@@ -345,9 +345,9 @@ static void update_item_width (WinlistPlugin *wl, WindowItem *item)
         {
             if (tlen < strlen (item->title))
             {
-                str[tlen - 3] = '.';
-                str[tlen - 2] = '.';
-                str[tlen - 1] = '.';
+                if (tlen > 2) str[tlen - 3] = '.';
+                if (tlen > 1) str[tlen - 2] = '.';
+                if (tlen > 0) str[tlen - 1] = '.';
             }
             str[tlen] = 0;
             gtk_label_set_text (GTK_LABEL (item->label), str);
