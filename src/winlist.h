@@ -46,6 +46,7 @@ typedef struct
 
     int spacing;
     int max_width;
+    int item_width;
     gboolean icons_only;
 
     struct zwlr_foreign_toplevel_manager_v1 *manager;
@@ -60,6 +61,8 @@ typedef struct
     char *title;
     int state;
     GtkWidget *btn;
+    GtkWidget *icon;
+    GtkWidget *label;
     GtkGesture *gesture;
 } WindowItem;
 
