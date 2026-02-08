@@ -219,7 +219,7 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         }
 
         // force resize so buttons grow now there is more free space
-        if (item->btn) gtk_widget_set_size_request (item->btn, wl->max_width, -1);
+        if (!wl->icons_only && item->btn) gtk_widget_set_size_request (item->btn, wl->max_width, -1);
 
         list = g_list_next (list);
     }
@@ -336,7 +336,13 @@ static void update_item_width (WinlistPlugin *wl, WindowItem *item)
     char *str;
     size_t tlen;
     int pref, min;
-    
+
+    if (wl->icons_only)
+    {
+        gtk_widget_set_size_request (item->btn, wl->item_width, -1);
+        return;
+    }
+
     gtk_widget_set_size_request (item->btn, wl->item_width, -1);
 
     if (item->title)
@@ -471,7 +477,7 @@ static void create_button (WinlistPlugin *wl, WindowItem *item)
 
 static void update_icons (WinlistPlugin *wl)
 {
-    return; // !!!! fix this
+    // might still need work...
     WindowItem *item;
     GList *list, *children;
 
@@ -488,7 +494,6 @@ static void update_icons (WinlistPlugin *wl)
         list = g_list_next (list);
     }
 
-    update_widths (wl, 1);  // !!!!!! not 1!
     gtk_box_set_spacing (GTK_BOX (wl->plugin), wl->spacing);
 }
 
