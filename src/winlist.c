@@ -67,7 +67,7 @@ static void minimise_app (GtkWidget *, gpointer userdata);
 static void unminimise_app (GtkWidget *, gpointer userdata);
 static void update_item_width (WinlistPlugin *wl, WindowItem *item);
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item);
-static void update_widths (WinlistPlugin *wl);
+static void update_widths (WinlistPlugin *wl, int width);
 static void create_button (WinlistPlugin *wl, WindowItem *item);
 static void update_icons (WinlistPlugin *wl);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
@@ -426,10 +426,9 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
     if (item->title) gtk_widget_set_tooltip_text (item->btn, item->title);
 }
 
-static void update_widths (WinlistPlugin *wl)
+static void update_widths (WinlistPlugin *wl, int width)
 {
     WindowItem *item;
-    GdkRectangle alloc;
     GList *list;
     int target, count = 0;
 
@@ -441,8 +440,7 @@ static void update_widths (WinlistPlugin *wl)
         list = g_list_next (list);
     }
 
-    gtk_widget_get_allocation (wl->plugin, &alloc);
-    target = alloc.width;
+    target = width;
     target -= wl->spacing * (count - 1);
     target /= count;
     if (target >= wl->max_width) wl->item_width = wl->max_width;
@@ -490,7 +488,7 @@ static void update_icons (WinlistPlugin *wl)
         list = g_list_next (list);
     }
 
-    update_widths (wl);
+    update_widths (wl, 1);  // !!!!!! not 1!
     gtk_box_set_spacing (GTK_BOX (wl->plugin), wl->spacing);
 }
 
@@ -573,7 +571,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 
 static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer data)
 {
-   if (alloc->width > 1) update_widths ((WinlistPlugin *) data);
+   if (alloc->width > 1) update_widths ((WinlistPlugin *) data, alloc->width);
 }
 
 /*----------------------------------------------------------------------------*/
