@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define WIDGETS_WINLIST_HPP
 
 #include <widget.hpp>
-#include <gtkmm/hvbox.h>
+#include <gtkmm/scrolledwindow.h>
 #include <gtkmm/gesturelongpress.h>
 
 extern "C" {
@@ -40,7 +40,7 @@ extern "C" {
 
 class WayfireWinlist : public WayfireWidget
 {
-    std::unique_ptr <Gtk::HBox> plugin;
+    std::unique_ptr <Gtk::ScrolledWindow> plugin;
 
     sigc::connection icon_timer;
 

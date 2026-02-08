@@ -216,12 +216,13 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
             if (item->title) g_free (item->title);
             if (item->app_id) g_free (item->app_id);
             wl->windows = g_list_delete_link (wl->windows, list);
-            break;
         }
+
+        // force resize so buttons grow now there is more free space
+        if (item->btn) gtk_widget_set_size_request (item->btn, wl->max_width, -1);
+
         list = g_list_next (list);
     }
-
-    update_widths (wl);
 }
 
 static void handle_toplevel_done (void *, HANDLE_PTR)
@@ -428,6 +429,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
 static void update_widths (WinlistPlugin *wl)
 {
     WindowItem *item;
+    GdkRectangle alloc;
     GList *list;
     int target, count = 0;
 
@@ -439,7 +441,8 @@ static void update_widths (WinlistPlugin *wl)
         list = g_list_next (list);
     }
 
-    target = MAXWIDTH;
+    gtk_widget_get_allocation (wl->plugin, &alloc);
+    target = alloc.width;
     target -= wl->spacing * (count - 1);
     target /= count;
     if (target >= wl->max_width) wl->item_width = wl->max_width;
@@ -463,15 +466,14 @@ static void create_button (WinlistPlugin *wl, WindowItem *item)
         g_signal_connect (item->btn, "button-press-event", G_CALLBACK (handle_button_pressed), item);
         g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
         set_icon_and_title (wl, item);
-        gtk_container_add (GTK_CONTAINER (wl->plugin), item->btn);
+        gtk_container_add (GTK_CONTAINER (wl->box), item->btn);
         gtk_widget_show_all (wl->plugin);
     }
-
-    update_widths (wl);
 }
 
 static void update_icons (WinlistPlugin *wl)
 {
+    return; // !!!! fix this
     WindowItem *item;
     GList *list, *children;
 
@@ -569,6 +571,11 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     gtk_menu_popup_at_widget (GTK_MENU (menu), widget, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST, NULL);
 }
 
+static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer data)
+{
+   if (alloc->width > 1) update_widths ((WinlistPlugin *) data);
+}
+
 /*----------------------------------------------------------------------------*/
 /* wf-panel plugin functions                                                  */
 /*----------------------------------------------------------------------------*/
@@ -592,8 +599,12 @@ void wlist_init (WinlistPlugin *wl)
     bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 
     /* Set up variables */
-    gtk_box_set_spacing (GTK_BOX (wl->plugin), wl->spacing);
-   // g_signal_connect (wl->plugin, "size-allocate", G_CALLBACK (set_size), wl);
+    wl->item_width = wl->max_width;
+    wl->box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, wl->spacing);
+    gtk_box_set_homogeneous (GTK_BOX (wl->box), TRUE);
+    gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
+    gtk_container_add (GTK_CONTAINER (wl->plugin), wl->box);
+    g_signal_connect (wl->plugin, "size-allocate", G_CALLBACK (update_size), wl);
 
     wl->windows = NULL;
 

@@ -65,9 +65,11 @@ void WayfireWinlist::settings_changed_cb (void)
 void WayfireWinlist::init (Gtk::HBox *container)
 {
     /* Create the button */
-    plugin = std::make_unique <Gtk::HBox> ();
+    plugin = std::make_unique <Gtk::ScrolledWindow> ();
     plugin->set_name (PLUGIN_NAME);
-    plugin->set_homogeneous (true);
+    plugin->set_propagate_natural_width (true);
+    plugin->set_policy (Gtk::POLICY_EXTERNAL, Gtk::POLICY_EXTERNAL);
+
     container->pack_start (*plugin, false, false);
 
     /* Setup structure */
