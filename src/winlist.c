@@ -144,6 +144,7 @@ static void handle_toplevel_parent (void *data, HANDLE_PTR handle, HANDLE_PTR pa
                 item->icon = NULL;
                 item->label = NULL;
                 item->btn = NULL;
+                item->gesture = NULL;
             }
             break;
         }
