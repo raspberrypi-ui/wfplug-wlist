@@ -73,6 +73,9 @@ static void update_icons (WinlistPlugin *wl);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpointer userdata);
+static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
+static void handle_drag_update (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
+static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 
 /*----------------------------------------------------------------------------*/
@@ -255,6 +258,7 @@ static void handle_manager_toplevel (void *data, MANAGER_PTR, HANDLE_PTR topleve
     WinlistPlugin *wl = (WinlistPlugin*) data;
     WindowItem *item = g_new0 (WindowItem, 1);
 
+    item->plugin = wl;
     item->handle = (void *) toplevel;
     wl->windows = g_list_append (wl->windows, item);
     zwlr_foreign_toplevel_handle_v1_add_listener (toplevel, &toplevel_handle_v1, data);
@@ -464,12 +468,20 @@ static void update_widths (WinlistPlugin *wl, int width)
 
 static void create_button (WinlistPlugin *wl, WindowItem *item)
 {
+    GtkGesture *drag;
+
     if (!item->parent)
     {
         item->btn = gtk_toggle_button_new ();
         item->gesture = add_long_press (item->btn, G_CALLBACK (handle_gesture_end), item);
-        g_signal_connect (item->btn, "button-press-event", G_CALLBACK (handle_button_pressed), item);
+        g_signal_connect (item->btn, "button-press-event", G_CALLBACK (handle_button_pressed), wl);
         g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
+
+        drag = gtk_gesture_drag_new (item->btn);
+        g_signal_connect (drag, "drag-begin", G_CALLBACK (handle_drag_begin), wl);
+        g_signal_connect (drag, "drag-update", G_CALLBACK (handle_drag_update), wl);
+        g_signal_connect (drag, "drag-end", G_CALLBACK (handle_drag_end), wl);
+
         set_icon_and_title (wl, item);
         gtk_container_add (GTK_CONTAINER (wl->box), item->btn);
         gtk_widget_show_all (wl->plugin);
@@ -502,8 +514,10 @@ static void update_icons (WinlistPlugin *wl)
 /* Handlers                                                                   */
 /*----------------------------------------------------------------------------*/
 
-static gboolean handle_button_pressed (GtkWidget *, GdkEventButton *, gpointer)
+static gboolean handle_button_pressed (GtkWidget *self, GdkEventButton *, gpointer userdata)
 {
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    wl->dragbtn = self;
     pressed = PRESS_NONE;
     return FALSE;
 }
@@ -511,6 +525,12 @@ static gboolean handle_button_pressed (GtkWidget *, GdkEventButton *, gpointer)
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata)
 {
     WindowItem *win = (WindowItem *) userdata;
+
+    if (win->plugin->noclick)
+    {
+        win->plugin->noclick = FALSE;
+        return FALSE;
+    }
 
     if (pressed == PRESS_LONG) return FALSE;
 
@@ -534,6 +554,45 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
     {
         popup_menu (item->btn, userdata);
     }
+}
+
+static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer userdata)
+{
+}
+
+static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble y, gpointer userdata)
+{
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    GList *children, *index;
+    int moveby;
+    int width;
+    GtkAllocation alloc;
+
+    wl->noclick = TRUE;
+
+    width = wl->icons_only ? get_icon_size (wl->plugin) : wl->item_width;
+
+    children = gtk_container_get_children (GTK_CONTAINER (wl->box));
+    index = children;
+    moveby = x / width;
+    while (index)
+    {
+        if (index->data == wl->dragbtn) break;
+        moveby++;
+        index = index->next;
+    }
+
+    gtk_box_reorder_child (GTK_BOX (wl->box), wl->dragbtn, moveby);
+    gtk_widget_queue_draw (wl->box);
+}
+
+static void handle_drag_end (GtkGestureDrag *self, gdouble x, gdouble y, gpointer userdata)
+{
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+
+    wl->noclick = FALSE;
+
+    // update the list here!!!!
 }
 
 static void popup_menu (GtkWidget *widget, gpointer userdata)
@@ -575,9 +634,11 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     gtk_menu_popup_at_widget (GTK_MENU (menu), widget, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST, NULL);
 }
 
-static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer data)
+static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer userdata)
 {
-   if (alloc->width > 1) update_widths ((WinlistPlugin *) data, alloc->width);
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    if (wl->noclick) return;
+    if (alloc->width > 1) update_widths (wl, alloc->width);
 }
 
 /*----------------------------------------------------------------------------*/
