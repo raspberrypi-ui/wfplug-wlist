@@ -494,7 +494,7 @@ static void update_icons (WinlistPlugin *wl)
         list = g_list_next (list);
     }
 
-    gtk_box_set_spacing (GTK_BOX (wl->plugin), wl->spacing);
+    gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
 }
 
 /*----------------------------------------------------------------------------*/
