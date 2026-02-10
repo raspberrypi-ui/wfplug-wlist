@@ -50,7 +50,9 @@ typedef struct
     int max_width;
     int item_width;
     gboolean icons_only;
-    gboolean noclick;
+    gboolean dragon;
+
+    GdkCursor *drag;
 
     struct zwlr_foreign_toplevel_manager_v1 *manager;
     MenuCache* menu_cache;
@@ -68,6 +70,7 @@ typedef struct
     GtkWidget *icon;
     GtkWidget *label;
     GtkGesture *gesture;
+    GtkGesture *dgesture;
 } WindowItem;
 
 extern conf_table_t conf_table[4];
