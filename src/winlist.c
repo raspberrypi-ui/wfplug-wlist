@@ -163,7 +163,7 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
     int flags = 0;
     uint32_t *arr;
     WindowItem *item;
-    GList *list;
+    GList *list = wl->windows;
 
     wl_array_for_each (arr, state)
     {
@@ -177,7 +177,6 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
             flags |= STATE_MINIMISED;
     }
 
-    list = wl->windows;
     while (list)
     {
         item = (WindowItem *) list->data;
@@ -225,10 +224,12 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         }
 
         // force resize so buttons grow now there is more free space
-        if (!wl->icons_only && item->btn) gtk_widget_set_size_request (item->btn, wl->max_width, -1);
+        else if (!wl->icons_only && item->btn) gtk_widget_set_size_request (item->btn, wl->max_width, -1);
 
         list = g_list_next (list);
     }
+
+    gtk_widget_queue_allocate (wl->plugin);
 }
 
 static void handle_toplevel_done (void *, HANDLE_PTR)
@@ -346,7 +347,7 @@ static void update_item_width (WinlistPlugin *wl, WindowItem *item)
 
     if (wl->icons_only)
     {
-        gtk_widget_set_size_request (item->btn, wl->item_width, -1);
+        gtk_widget_set_size_request (item->btn, -1, -1);
         return;
     }
 
@@ -442,10 +443,9 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
 static void update_widths (WinlistPlugin *wl, int width)
 {
     WindowItem *item;
-    GList *list;
+    GList *list = wl->windows;
     int target, count = 0;
 
-    list = wl->windows;
     while (list)
     {
         item = (WindowItem *) list->data;
@@ -576,15 +576,23 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble y, gpointer
     children = gtk_container_get_children (GTK_CONTAINER (wl->box));
     index = children;
     moveby = x / width;
+    if (!moveby)
+    {
+        g_list_free (children);
+        return;
+    }
+
     while (index)
     {
         if (index->data == wl->dragbtn) break;
         moveby++;
         index = index->next;
     }
+    g_list_free (children);
 
     gtk_box_reorder_child (GTK_BOX (wl->box), wl->dragbtn, moveby);
-    gtk_widget_queue_draw (wl->box);
+
+    gtk_widget_queue_allocate (wl->plugin);
 }
 
 static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata)
