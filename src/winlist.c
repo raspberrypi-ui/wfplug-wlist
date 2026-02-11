@@ -500,6 +500,9 @@ static void update_icons (WinlistPlugin *wl)
         item = (WindowItem *) list->data;
         if (item->btn)
         {
+            wl->item_width = wl->max_width;
+            if (wl->icons_only) gtk_widget_set_size_request (item->btn, -1, -1);
+            else gtk_widget_set_size_request (item->btn, wl->item_width, -1);
             children = gtk_container_get_children (GTK_CONTAINER (item->btn));
             g_list_free_full (children, (GDestroyNotify) gtk_widget_destroy);
             set_icon_and_title (wl, item);
@@ -508,6 +511,7 @@ static void update_icons (WinlistPlugin *wl)
     }
 
     gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
+    gtk_widget_queue_allocate (wl->plugin);
 }
 
 /*----------------------------------------------------------------------------*/
