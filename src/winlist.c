@@ -85,8 +85,9 @@ static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void handle_toplevel_title (void *data, HANDLE_PTR handle, const char *title)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *list = wl->windows;
+    GList *list;
 
+    list = wl->windows;
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
@@ -112,8 +113,9 @@ static void handle_toplevel_title (void *data, HANDLE_PTR handle, const char *ti
 static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *app_id)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *list = wl->windows;
+    GList *list;
 
+    list = wl->windows;
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
@@ -130,8 +132,9 @@ static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *a
 static void handle_toplevel_parent (void *data, HANDLE_PTR handle, HANDLE_PTR parent)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *list = wl->windows;
+    GList *list;
 
+    list = wl->windows;
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
@@ -163,7 +166,7 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
     int flags = 0;
     uint32_t *arr;
     WindowItem *item;
-    GList *list = wl->windows;
+    GList *list;
 
     wl_array_for_each (arr, state)
     {
@@ -177,6 +180,7 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
             flags |= STATE_MINIMISED;
     }
 
+    list = wl->windows;
     while (list)
     {
         item = (WindowItem *) list->data;
@@ -207,8 +211,9 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
 static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
-    GList *list = wl->windows;
+    GList *list;
 
+    list = wl->windows;
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
@@ -263,7 +268,7 @@ static void handle_manager_toplevel (void *data, MANAGER_PTR, HANDLE_PTR topleve
 
     item->plugin = wl;
     item->handle = (void *) toplevel;
-    wl->windows = g_list_append (wl->windows, item);
+    wl->windows = g_list_prepend (wl->windows, item);
     zwlr_foreign_toplevel_handle_v1_add_listener (toplevel, &toplevel_handle_v1, data);
 }
 
@@ -443,9 +448,10 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
 static void update_widths (WinlistPlugin *wl, int width)
 {
     WindowItem *item;
-    GList *list = wl->windows;
+    GList *list;
     int target, count = 0;
 
+    list = wl->windows;
     while (list)
     {
         item = (WindowItem *) list->data;
@@ -560,7 +566,7 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
     }
 }
 
-static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer userdata)
+static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer)
 {
 }
 
@@ -578,7 +584,6 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble y, gpointer
     width = wl->icons_only ? get_icon_size (wl->plugin) : wl->item_width;
 
     children = gtk_container_get_children (GTK_CONTAINER (wl->box));
-    index = children;
     moveby = x / width;
     if (!moveby)
     {
@@ -586,6 +591,7 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble y, gpointer
         return;
     }
 
+    index = children;
     while (index)
     {
         if (index->data == wl->dragbtn) break;
