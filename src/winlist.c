@@ -77,6 +77,8 @@ static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer user
 static void handle_drag_update (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
+static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer userdata);
+static gboolean idle_resize (gpointer userdata);
 
 /*----------------------------------------------------------------------------*/
 /* Wayland protocol interface                                                 */
@@ -211,12 +213,13 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
 static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
+    WindowItem *item;
     GList *list;
 
     list = wl->windows;
     while (list)
     {
-        WindowItem *item = (WindowItem *) list->data;
+        item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
             if (item->icon) gtk_widget_destroy (item->icon);
@@ -226,15 +229,24 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
             if (item->title) g_free (item->title);
             if (item->app_id) g_free (item->app_id);
             wl->windows = g_list_delete_link (wl->windows, list);
+            break;
         }
-
-        // force resize so buttons grow now there is more free space
-        else if (!wl->icons_only && item->btn) gtk_widget_set_size_request (item->btn, wl->max_width, -1);
-
         list = g_list_next (list);
     }
 
-    gtk_widget_queue_allocate (wl->plugin);
+    // force resize so buttons grow now there is more free space
+    if (!wl->icons_only)
+    {
+        list = wl->windows;
+        while (list)
+        {
+            item = (WindowItem *) list->data;
+            if (item->btn) gtk_widget_set_size_request (item->btn, wl->max_width, -1);
+            list = g_list_next (list);
+        }
+    }
+
+    g_idle_add (idle_resize, wl);
 }
 
 static void handle_toplevel_done (void *, HANDLE_PTR)
@@ -430,6 +442,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
     else
     {
         item->label = gtk_label_new (item->title);
+        gtk_label_set_xalign (GTK_LABEL (item->label), 0.0);
 
         box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
         gtk_container_add (GTK_CONTAINER (box), item->icon);
@@ -449,8 +462,9 @@ static void update_widths (WinlistPlugin *wl, int width)
 {
     WindowItem *item;
     GList *list;
-    int target, count = 0;
+    int target, count, oldwidth;
 
+    count = 0;
     list = wl->windows;
     while (list)
     {
@@ -459,6 +473,7 @@ static void update_widths (WinlistPlugin *wl, int width)
         list = g_list_next (list);
     }
 
+    oldwidth = wl->item_width;
     target = width;
     target -= wl->spacing * (count - 1);
     target /= count;
@@ -472,6 +487,8 @@ static void update_widths (WinlistPlugin *wl, int width)
         if (item->btn) update_item_width (wl, item);
         list = g_list_next (list);
     }
+
+    if (oldwidth != wl->item_width) g_idle_add (idle_resize, wl);
 }
 
 static void create_button (WinlistPlugin *wl, WindowItem *item)
@@ -491,6 +508,8 @@ static void create_button (WinlistPlugin *wl, WindowItem *item)
         set_icon_and_title (wl, item);
         gtk_container_add (GTK_CONTAINER (wl->box), item->btn);
         gtk_widget_show_all (wl->plugin);
+
+        g_idle_add (idle_resize, wl);
     }
 }
 
@@ -659,6 +678,13 @@ static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer userdata)
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     if (wl->dragon) return;
     if (alloc->width > 1) update_widths (wl, alloc->width);
+}
+
+static gboolean idle_resize (gpointer userdata)
+{
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    gtk_widget_queue_resize (wl->plugin);
+    return FALSE;
 }
 
 /*----------------------------------------------------------------------------*/
