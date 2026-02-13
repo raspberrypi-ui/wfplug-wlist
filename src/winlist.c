@@ -598,7 +598,7 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble, gpointer u
     GList *children, *index;
     int moveby, width;
 
-    if (!wl->dragon && abs (x) < DRAG_THRESH) return;
+    if (!wl->dragon && x < DRAG_THRESH && x > -DRAG_THRESH) return;
 
     wl->dragon = TRUE;
     gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), wl->drag);
@@ -608,8 +608,8 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble, gpointer u
     width = wl->icons_only ? get_icon_size (wl->plugin) : wl->item_width;
 
     moveby = 0;
-    if (wl->drag_start + x < 0) moveby = -1;
-    if (wl->drag_start + x > width) moveby = 1;
+    if (wl->drag_start + x < -DRAG_THRESH) moveby = -1;
+    if (wl->drag_start + x > width + DRAG_THRESH) moveby = 1;
     if (!moveby) return;
 
     children = gtk_container_get_children (GTK_CONTAINER (wl->box));
