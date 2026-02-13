@@ -585,31 +585,34 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
     }
 }
 
-static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer)
-{
-}
-
-static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble y, gpointer userdata)
+static void handle_drag_begin (GtkGestureDrag *, gdouble x, gdouble, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    wl->drag_start = x;
+}
+
+static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble, gpointer userdata)
+{
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    GtkStyleContext *sc;
     GList *children, *index;
-    int moveby;
-    int width;
+    int moveby, width;
 
     if (!wl->dragon && abs (x) < DRAG_THRESH) return;
-    gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), wl->drag);
+
     wl->dragon = TRUE;
+    gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), wl->drag);
+    sc = gtk_widget_get_style_context (wl->dragbtn);
+    gtk_style_context_add_class (sc, "drag");
 
     width = wl->icons_only ? get_icon_size (wl->plugin) : wl->item_width;
 
-    children = gtk_container_get_children (GTK_CONTAINER (wl->box));
-    moveby = x / width;
-    if (!moveby)
-    {
-        g_list_free (children);
-        return;
-    }
+    moveby = 0;
+    if (wl->drag_start + x < 0) moveby = -1;
+    if (wl->drag_start + x > width) moveby = 1;
+    if (!moveby) return;
 
+    children = gtk_container_get_children (GTK_CONTAINER (wl->box));
     index = children;
     while (index)
     {
@@ -619,7 +622,7 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble y, gpointer
     }
     g_list_free (children);
 
-    gtk_box_reorder_child (GTK_BOX (wl->box), wl->dragbtn, moveby);
+    if (moveby >= 0) gtk_box_reorder_child (GTK_BOX (wl->box), wl->dragbtn, moveby);
 
     gtk_widget_queue_allocate (wl->plugin);
 }
@@ -627,11 +630,12 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble y, gpointer
 static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
-
-    // update the list here!!!!
+    GtkStyleContext *sc;
 
     wl->dragon = FALSE;
     gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), NULL);
+    sc = gtk_widget_get_style_context (wl->dragbtn);
+    gtk_style_context_remove_class (sc, "drag");
 }
 
 static void popup_menu (GtkWidget *widget, gpointer userdata)

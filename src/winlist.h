@@ -42,7 +42,6 @@ typedef struct
 {
     GtkWidget *plugin;
     GtkWidget *box;
-    GtkWidget *dragbtn;
 
     GList *windows;
 
@@ -50,9 +49,11 @@ typedef struct
     int max_width;
     int item_width;
     gboolean icons_only;
-    gboolean dragon;
 
+    GtkWidget *dragbtn;
+    float drag_start;
     GdkCursor *drag;
+    gboolean dragon;
 
     struct zwlr_foreign_toplevel_manager_v1 *manager;
     MenuCache* menu_cache;
