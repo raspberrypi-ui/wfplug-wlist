@@ -579,6 +579,8 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
 {
     WindowItem *item = (WindowItem *) userdata;
 
+    if (item->plugin->dragon) return;
+
     if (pressed == PRESS_LONG)
     {
         popup_menu (item->btn, userdata);
