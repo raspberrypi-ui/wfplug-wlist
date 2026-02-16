@@ -96,11 +96,7 @@ static void handle_toplevel_title (void *data, HANDLE_PTR handle, const char *ti
         WindowItem *item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
-            if (!item->title)
-            {
-                item->title = g_strdup (title);
-                if (item->app_id) create_button (wl, item);
-            }
+            if (!item->title) item->title = g_strdup (title);
             else
             {
                 g_free (item->title);
@@ -125,7 +121,6 @@ static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *a
         if (item->handle == (void *) handle)
         {
             item->app_id = g_strdup (app_id);
-            if (item->title) create_button (wl, item);
             break;
         }
         list = g_list_next (list);
@@ -144,7 +139,6 @@ static void handle_toplevel_parent (void *data, HANDLE_PTR handle, HANDLE_PTR pa
         if (item->handle == (void *) handle)
         {
             item->parent = (void *) parent;
-            if (item->parent && item->btn) destroy_button (item);
             break;
         }
         list = g_list_next (list);
@@ -235,8 +229,22 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
     g_idle_add (idle_resize, wl);
 }
 
-static void handle_toplevel_done (void *, HANDLE_PTR)
+static void handle_toplevel_done (void *data, HANDLE_PTR handle)
 {
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    GList *list;
+
+    list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            if (!item->btn && item->title && item->app_id && !item->parent) create_button (wl, item);
+            break;
+        }
+        list = g_list_next (list);
+    }
 }
 
 static void handle_toplevel_output_enter (void *, HANDLE_PTR, struct wl_output *)
@@ -344,24 +352,21 @@ static void unminimise_app (GtkWidget *, gpointer userdata)
 
 static void create_button (WinlistPlugin *wl, WindowItem *item)
 {
-    if (!item->parent)
-    {
-        item->btn = gtk_toggle_button_new ();
-        item->gesture = add_long_press (item->btn, G_CALLBACK (handle_gesture_end), item);
-        g_signal_connect (item->btn, "button-press-event", G_CALLBACK (handle_button_pressed), wl);
-        g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
+    item->btn = gtk_toggle_button_new ();
+    item->gesture = add_long_press (item->btn, G_CALLBACK (handle_gesture_end), item);
+    g_signal_connect (item->btn, "button-press-event", G_CALLBACK (handle_button_pressed), wl);
+    g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
 
-        item->dgesture = gtk_gesture_drag_new (item->btn);
-        g_signal_connect (item->dgesture, "drag-begin", G_CALLBACK (handle_drag_begin), wl);
-        g_signal_connect (item->dgesture, "drag-update", G_CALLBACK (handle_drag_update), wl);
-        g_signal_connect (item->dgesture, "drag-end", G_CALLBACK (handle_drag_end), wl);
+    item->dgesture = gtk_gesture_drag_new (item->btn);
+    g_signal_connect (item->dgesture, "drag-begin", G_CALLBACK (handle_drag_begin), wl);
+    g_signal_connect (item->dgesture, "drag-update", G_CALLBACK (handle_drag_update), wl);
+    g_signal_connect (item->dgesture, "drag-end", G_CALLBACK (handle_drag_end), wl);
 
-        set_icon_and_title (wl, item);
-        gtk_container_add (GTK_CONTAINER (wl->box), item->btn);
-        gtk_widget_show_all (wl->plugin);
+    set_icon_and_title (wl, item);
+    gtk_container_add (GTK_CONTAINER (wl->box), item->btn);
+    gtk_widget_show_all (wl->plugin);
 
-        g_idle_add (idle_resize, wl);
-    }
+    g_idle_add (idle_resize, wl);
 }
 
 static void destroy_button (WindowItem *item)
@@ -731,7 +736,7 @@ void wlist_init (WinlistPlugin *wl)
     wl->windows = NULL;
 
     gboolean need_prefix = (g_getenv ("XDG_MENU_PREFIX") == NULL);
-    wl->menu_cache = menu_cache_lookup (need_prefix ? "lxde-applications.menu" : "applications.menu");
+    wl->menu_cache = menu_cache_lookup (need_prefix ? "lxde-applications.menu+hidden" : "applications.menu+hidden");
     menu_cache_add_reload_notify (wl->menu_cache, NULL, NULL);
 
     GdkDisplay *gdk_display = gdk_display_get_default ();
