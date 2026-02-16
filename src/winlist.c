@@ -67,6 +67,9 @@ static void minimise_app (GtkWidget *, gpointer userdata);
 static void unminimise_app (GtkWidget *, gpointer userdata);
 static void create_button (WinlistPlugin *wl, WindowItem *item);
 static void destroy_button (WindowItem *item);
+static float score_match (const char *str1, const char *str2);
+static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
+static void load_icon_from_cache (WindowItem *item, char *icon_name);
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item);
 static void update_item_width (WinlistPlugin *wl, WindowItem *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
@@ -383,48 +386,215 @@ static void destroy_button (WindowItem *item)
     item->dgesture = NULL;
 }
 
+/* This is an attempt to score how similar two strings are by comparing how many letters
+ * at the start of each are identical, and how many letters at the end are identical. It's
+ * not perfect... */
+
+static float score_match (const char *str1, const char *str2)
+{
+    int count, score, pos1, pos2;
+    char *str1l, *str2l;
+    float result;
+
+    if (!str1 || !str2) return 0.0;
+
+    str1l = g_ascii_strdown (str1, -1);
+    str2l = g_ascii_strdown (str2, -1);
+
+    // count matching characters from start
+    score = 0;
+    count = 0;
+    pos1 = 0;
+    while (str1l[pos1] && str2l[pos1] && str1l[pos1] == str2l[pos1])
+    {
+        count++;
+        pos1++;
+    }
+    score = count;
+
+    // count matching characters from end
+    pos1 = strlen (str1l) - 1;
+    pos2 = strlen (str2l) - 1;
+    while (pos1 && pos2 && str1l[pos1] == str2l[pos2])
+    {
+        count++;
+        pos1--;
+        pos2--;
+    }
+    if (count > score) score = count;
+
+    result = score;
+    if (strlen (str1l) > strlen (str2l)) result /= strlen (str2l);
+    else result /= strlen (str1l);
+
+    g_free (str1l);
+    g_free (str2l);
+
+    return result;
+}
+
+static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
+{
+    MenuCacheItem *item;
+    GSList *list, *iter;
+    GAppInfo *info;
+    char *id, *exec, *ptr, *best = NULL;
+    float res, score;
+    const char *ex;
+
+    // loop through the cache to find the best match
+    score = 0.0;
+    list = menu_cache_list_all_apps (wl->menu_cache);
+    iter = list;
+    while (iter)
+    {
+        item = (MenuCacheItem *) iter->data;
+
+        // first check that the cache item is a valid desktop info, i.e. has an associated exec
+        id = g_strdup (menu_cache_item_get_id (item));
+        info = (GAppInfo *) g_desktop_app_info_new (id);
+        if (!info)
+        {
+            g_free (id);
+            iter = iter->next;
+            continue;
+        }
+        else g_free (info);
+
+        // strip the .desktop from the end for matching purposes
+        *strrchr (id, '.') = 0;
+
+        // if there is a caseless match with the app-id, this is correct - return it
+        if (!g_strcasecmp (app_id, id))
+        {
+            if (best) g_free (best);
+            g_slist_free_full (list, (GDestroyNotify) ((void *) menu_cache_item_unref));
+            return id;
+        }
+
+        // didn't match - get the executable name
+        ex = menu_cache_app_get_exec ((MenuCacheApp *) item);
+        if (ex)
+        {
+            exec = g_path_get_basename (ex);  // this needs fixing for the scratch-desktop" case....
+            ptr = strchr (exec, ' ');
+            if (ptr) *ptr = 0;
+        }
+        else exec = NULL;
+
+        // if there is a caseless match with the executable, this is correct - return it
+        if (exec && !g_strcasecmp (app_id, exec))
+        {
+            g_free (exec);
+            if (best) g_free (best);
+            g_slist_free_full (list, (GDestroyNotify) ((void *) menu_cache_item_unref));
+            return id;
+        }
+
+        // look for matching characters at start and end
+        res = score_match (app_id, id);
+        if (res > score)
+        {
+            score = res;
+            if (best) g_free (best);
+            best = g_strdup (id);
+        }
+
+        if (exec)
+        {
+            res = score_match (app_id, exec);
+            if (res > score)
+            {
+                score = res;
+                if (best) g_free (best);
+                best = g_strdup (id);
+            }
+            g_free (exec);
+        }
+
+        g_free (id);
+        iter = iter->next;
+    }
+    g_slist_free_full (list, (GDestroyNotify) ((void *) menu_cache_item_unref));
+    return best;
+}
+
+static void load_icon_from_cache (WindowItem *item, char *icon_name)
+{
+    GdkPixbuf *icon = NULL;
+    int scale;
+
+    item->icon = gtk_image_new ();
+    scale = gtk_widget_get_scale_factor (item->icon);
+    if (icon_name)
+    {
+        if (strstr (icon_name, "/"))
+            icon = gdk_pixbuf_new_from_file_at_size (icon_name, wrap_icon_size (item->plugin) * scale,
+                wrap_icon_size (item->plugin) * scale, NULL);
+        else
+        {
+            icon = gtk_icon_theme_load_icon_for_scale (gtk_icon_theme_get_default (), icon_name,
+                wrap_icon_size (item->plugin), scale, GTK_ICON_LOOKUP_FORCE_SIZE, NULL);
+
+            // fallback for packages using obsolete icon location
+            if (!icon)
+            {
+                char *fname = g_strdup_printf ("/usr/share/pixmaps/%s", icon_name);
+                icon = gdk_pixbuf_new_from_file_at_size (fname, wrap_icon_size (item->plugin) * scale,
+                    wrap_icon_size (item->plugin) * scale, NULL);
+                g_free (fname);
+            }
+        }
+    }
+    if (!icon)
+        icon = gtk_icon_theme_load_icon_for_scale (gtk_icon_theme_get_default (), "application-x-executable",
+            wrap_icon_size (item->plugin), scale, GTK_ICON_LOOKUP_FORCE_SIZE, NULL);
+
+    if (icon)
+    {
+        set_image_from_pixbuf (item->icon, icon);
+        g_object_unref (icon);
+    }
+}
+
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
 {
     GtkWidget *box;
-    char *str;
+    char *str, *id;
     GAppInfo *info;
     GIcon *ic;
-    GSList *list, *iter;
     MenuCacheItem *mitem;
 
+    // create the desktop file name from the app_id
     str = g_strdup_printf ("%s.desktop", item->app_id);
     info = (GAppInfo *) g_desktop_app_info_new (str);
     g_free (str);
 
-    str = NULL;
     if (info)
     {
+        // the desktop file name is valid, so just get the icon from it
         ic = g_app_info_get_icon (info);
         str = g_icon_to_string (ic);
+        g_free (info);
     }
     else
     {
-        // the app-id doesn't directly match anything, so see if an ID in the menu cache list contains it
-        list = menu_cache_list_all_apps (wl->menu_cache);
-        iter = list;
-        while (iter)
+        // the desktop file name isn't valid, so search the menu cache for something similar
+        id = menu_cache_id (wl, item->app_id);
+        str = g_strdup_printf ("%s.desktop", id);
+        g_free (id);
+        mitem = menu_cache_find_item_by_id (wl->menu_cache, str);
+        g_free (str);
+
+        if (mitem)
         {
-            mitem = (MenuCacheItem *) iter->data;
-            if (strcasestr (menu_cache_item_get_id (mitem), item->app_id))
-            {
-                str = g_strdup (menu_cache_item_get_icon (mitem));
-                break;
-            }
-            iter = iter->next;
+            str = g_strdup (menu_cache_item_get_icon (mitem));
+            menu_cache_item_unref (mitem);
         }
-        g_slist_free_full (list, (GDestroyNotify) ((void *) menu_cache_item_unref));
+        else str = NULL;
     }
 
-    // if we didn't find any matches, just use a default icon
-    if (!str) str = g_strdup ("application-x-executable");
-
-    item->icon = gtk_image_new ();
-    wrap_set_taskbar_icon (wl, item->icon, str);
+    load_icon_from_cache (item, str);
     g_free (str);
 
     if (wl->icons_only)
