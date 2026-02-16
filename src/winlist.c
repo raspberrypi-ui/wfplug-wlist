@@ -69,7 +69,6 @@ static void create_button (WinlistPlugin *wl, WindowItem *item);
 static void destroy_button (WindowItem *item);
 static float score_match (const char *str1, const char *str2);
 static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
-static void load_icon_from_cache (WindowItem *item, char *icon_name);
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item);
 static void update_item_width (WinlistPlugin *wl, WindowItem *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
@@ -519,44 +518,6 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
     return best;
 }
 
-static void load_icon_from_cache (WindowItem *item, char *icon_name)
-{
-    GdkPixbuf *icon = NULL;
-    int scale;
-
-    item->icon = gtk_image_new ();
-    scale = gtk_widget_get_scale_factor (item->icon);
-    if (icon_name)
-    {
-        if (strstr (icon_name, "/"))
-            icon = gdk_pixbuf_new_from_file_at_size (icon_name, wrap_icon_size (item->plugin) * scale,
-                wrap_icon_size (item->plugin) * scale, NULL);
-        else
-        {
-            icon = gtk_icon_theme_load_icon_for_scale (gtk_icon_theme_get_default (), icon_name,
-                wrap_icon_size (item->plugin), scale, GTK_ICON_LOOKUP_FORCE_SIZE, NULL);
-
-            // fallback for packages using obsolete icon location
-            if (!icon)
-            {
-                char *fname = g_strdup_printf ("/usr/share/pixmaps/%s", icon_name);
-                icon = gdk_pixbuf_new_from_file_at_size (fname, wrap_icon_size (item->plugin) * scale,
-                    wrap_icon_size (item->plugin) * scale, NULL);
-                g_free (fname);
-            }
-        }
-    }
-    if (!icon)
-        icon = gtk_icon_theme_load_icon_for_scale (gtk_icon_theme_get_default (), "application-x-executable",
-            wrap_icon_size (item->plugin), scale, GTK_ICON_LOOKUP_FORCE_SIZE, NULL);
-
-    if (icon)
-    {
-        set_image_from_pixbuf (item->icon, icon);
-        g_object_unref (icon);
-    }
-}
-
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
 {
     GtkWidget *box;
@@ -594,7 +555,8 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
         else str = NULL;
     }
 
-    load_icon_from_cache (item, str);
+    item->icon = gtk_image_new ();
+    wrap_set_taskbar_icon (wl, item->icon, str);
     g_free (str);
 
     if (wl->icons_only)
