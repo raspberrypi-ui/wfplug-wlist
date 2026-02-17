@@ -613,8 +613,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
 static void update_item_width (WinlistPlugin *wl, WindowItem *item)
 {
     char *str;
-    size_t tlen;
-    int pref, min;
+    int pref, min, tlen;
 
     if (wl->icons_only)
     {
@@ -627,9 +626,9 @@ static void update_item_width (WinlistPlugin *wl, WindowItem *item)
     if (item->title)
     {
         str = g_strdup (item->title);
-        for (tlen = strlen (str); tlen > 0; tlen--)
+        for (tlen = strlen (str); tlen >= 0; tlen--)
         {
-            if (tlen < strlen (item->title))
+            if (tlen < (int) strlen (item->title))
             {
                 if (tlen > 2) str[tlen - 3] = '.';
                 if (tlen > 1) str[tlen - 2] = '.';
