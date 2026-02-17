@@ -42,8 +42,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define HANDLE_PTR struct zwlr_foreign_toplevel_handle_v1 *
 #define MANAGER_PTR struct zwlr_foreign_toplevel_manager_v1 *
 
-#define MAXWIDTH 800
-
 /*----------------------------------------------------------------------------*/
 /* Global data                                                                */
 /*----------------------------------------------------------------------------*/
@@ -387,12 +385,12 @@ static void destroy_button (WindowItem *item)
 }
 
 /* This is an attempt to score how similar two strings are by comparing how many letters
- * at the start of each are identical, and how many letters at the end are identical. It's
- * not perfect... */
+ * at the start of each are identical, and how many letters at the end are identical.
+ * It's not perfect... */
 
 static float score_match (const char *str1, const char *str2)
 {
-    int count, score, pos1, pos2;
+    int score, pos1, pos2;
     char *str1l, *str2l;
     float result;
 
@@ -403,25 +401,22 @@ static float score_match (const char *str1, const char *str2)
 
     // count matching characters from start
     score = 0;
-    count = 0;
     pos1 = 0;
     while (str1l[pos1] && str2l[pos1] && str1l[pos1] == str2l[pos1])
     {
-        count++;
+        score++;
         pos1++;
     }
-    score = count;
 
     // count matching characters from end
     pos1 = strlen (str1l) - 1;
     pos2 = strlen (str2l) - 1;
     while (pos1 && pos2 && str1l[pos1] == str2l[pos2])
     {
-        count++;
+        score++;
         pos1--;
         pos2--;
     }
-    if (count > score) score = count;
 
     result = score;
     if (strlen (str1l) > strlen (str2l)) result /= strlen (str2l);
