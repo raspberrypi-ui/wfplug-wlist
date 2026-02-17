@@ -68,6 +68,7 @@ static void unminimise_app (GtkWidget *, gpointer userdata);
 static void create_button (WinlistPlugin *wl, WindowItem *item);
 static void destroy_button (WindowItem *item);
 static float score_match (const char *str1, const char *str2);
+static char *get_exe (const char *cmdline);
 static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
 static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item);
 static void update_item_width (WinlistPlugin *wl, WindowItem *item);
@@ -432,12 +433,43 @@ static float score_match (const char *str1, const char *str2)
     return result;
 }
 
+static char *get_exe (const char *cmdline)
+{
+    // g_path_get_basename fails with quoted paths, so...
+    char *buf, *start, *end, *ret;
+    char del;
+
+    buf = g_strdup (cmdline);
+
+    start = buf;
+    if (strchr ("'\"", *start))
+    {
+        del = *start;
+        start++;
+    }
+    else del = ' ';
+
+    end = start;
+    while (*end)
+    {
+        if (*end == del) break;
+        end++;
+    }
+    *end = 0;
+
+    if (strrchr (start, '/')) start = strrchr (start, '/') + 1;
+    ret = g_strdup (start);
+    g_free (buf);
+
+    return ret;
+}
+
 static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
 {
     MenuCacheItem *item;
     GSList *list, *iter;
     GAppInfo *info;
-    char *id, *exec, *ptr, *best = NULL;
+    char *id, *exec, *best = NULL;
     float res, score;
     const char *ex;
 
@@ -473,12 +505,7 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
 
         // didn't match - get the executable name
         ex = menu_cache_app_get_exec ((MenuCacheApp *) item);
-        if (ex)
-        {
-            exec = g_path_get_basename (ex);  // this needs fixing for the scratch-desktop" case....
-            ptr = strchr (exec, ' ');
-            if (ptr) *ptr = 0;
-        }
+        if (ex) exec = get_exe (ex);
         else exec = NULL;
 
         // if there is a caseless match with the executable, this is correct - return it
