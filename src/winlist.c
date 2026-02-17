@@ -378,7 +378,7 @@ static void destroy_button (WindowItem *item)
     if (item->label) gtk_widget_destroy (item->label);
     if (item->btn) gtk_widget_destroy (item->btn);
     if (item->gesture) g_object_unref (item->gesture);
-    if (item->dgesture) g_object_unref (item->gesture);
+    if (item->dgesture) g_object_unref (item->dgesture);
     item->icon = NULL;
     item->label = NULL;
     item->btn = NULL;
