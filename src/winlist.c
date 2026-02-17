@@ -496,7 +496,7 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
         *strrchr (id, '.') = 0;
 
         // if there is a caseless match with the app-id, this is correct - return it
-        if (!g_strcasecmp (app_id, id))
+        if (!g_ascii_strncasecmp (app_id, id, 1000))
         {
             if (best) g_free (best);
             g_slist_free_full (list, (GDestroyNotify) ((void *) menu_cache_item_unref));
@@ -509,7 +509,7 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
         else exec = NULL;
 
         // if there is a caseless match with the executable, this is correct - return it
-        if (exec && !g_strcasecmp (app_id, exec))
+        if (exec && !g_ascii_strncasecmp (app_id, exec, 1000))
         {
             g_free (exec);
             if (best) g_free (best);
