@@ -65,6 +65,7 @@ static void minimise_app (GtkWidget *, gpointer userdata);
 static void unminimise_app (GtkWidget *, gpointer userdata);
 static void create_button (WinlistPlugin *wl, WindowItem *item);
 static void destroy_button (WindowItem *item);
+static void free_list_item (gpointer data);
 static float score_match (const char *str1, const char *str2);
 static char *get_exe (const char *cmdline);
 static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
@@ -206,9 +207,7 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
-            destroy_button (item);
-            if (item->title) g_free (item->title);
-            if (item->app_id) g_free (item->app_id);
+            free_list_item (item);
             wl->windows = g_list_delete_link (wl->windows, list);
             break;
         }
@@ -279,8 +278,10 @@ static void handle_manager_toplevel (void *data, MANAGER_PTR, HANDLE_PTR topleve
     zwlr_foreign_toplevel_handle_v1_add_listener (toplevel, &toplevel_handle_v1, data);
 }
 
-static void handle_manager_finished (void *, MANAGER_PTR)
+static void handle_manager_finished (void *data, MANAGER_PTR)
 {
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    wl->manager = NULL;
 }
 
 struct zwlr_foreign_toplevel_manager_v1_listener toplevel_manager_v1 = 
@@ -384,6 +385,14 @@ static void destroy_button (WindowItem *item)
     item->dgesture = NULL;
 }
 
+static void free_list_item (gpointer data)
+{
+    WindowItem *item = (WindowItem *) data;
+    destroy_button (item);
+    if (item->title) g_free (item->title);
+    if (item->app_id) g_free (item->app_id);
+}
+
 /* This is an attempt to score how similar two strings are by comparing how many letters
  * at the start of each are identical, and how many letters at the end are identical.
  * It's not perfect... */
@@ -398,9 +407,9 @@ static float score_match (const char *str1, const char *str2)
 
     str1l = g_ascii_strdown (str1, -1);
     str2l = g_ascii_strdown (str2, -1);
+    score = 0;
 
     // count matching characters from start
-    score = 0;
     pos1 = 0;
     while (str1l[pos1] && str2l[pos1] && str1l[pos1] == str2l[pos1])
     {
@@ -903,11 +912,28 @@ void wlist_init (WinlistPlugin *wl)
     if (wl->manager) zwlr_foreign_toplevel_manager_v1_add_listener (wl->manager, &toplevel_manager_v1, wl);
 }
 
+static void close_handle (gpointer data, gpointer)
+{
+    WindowItem *item = (WindowItem *) data;
+    zwlr_foreign_toplevel_handle_v1_destroy (item->handle);
+}
+
 void wlist_destructor (gpointer user_data)
 {
     WinlistPlugin *wl = (WinlistPlugin *) user_data;
 
+    // stop the window manager
+    g_list_foreach (wl->windows, (GFunc) close_handle, wl);
+    if (wl->manager) zwlr_foreign_toplevel_manager_v1_stop (wl->manager);
+
     /* Deallocate memory */
+    if (wl->windows) g_list_free_full (wl->windows, (GDestroyNotify) free_list_item);
+    wl->windows = NULL;
+    if (wl->box) gtk_widget_destroy (wl->box);
+    wl->box = NULL;
+    if (wl->drag) g_object_unref (wl->drag);
+    wl->drag = NULL;
+
     g_free (wl);
 }
 
