@@ -43,6 +43,8 @@ typedef struct
     GtkWidget *plugin;
     GtkWidget *box;
 
+    GList *buttons;
+
     GList *windows;
 
     int spacing;
@@ -67,12 +69,20 @@ typedef struct
     char *app_id;
     char *title;
     int state;
+} WindowItem;
+
+typedef struct
+{
+    WinlistPlugin *plugin;
+    char *app_id;
+    int windows;
     GtkWidget *btn;
     GtkWidget *icon;
     GtkWidget *label;
     GtkGesture *gesture;
     GtkGesture *dgesture;
-} WindowItem;
+} WindowBtn;
+
 
 extern conf_table_t conf_table[4];
 
