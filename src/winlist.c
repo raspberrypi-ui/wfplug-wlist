@@ -47,10 +47,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*----------------------------------------------------------------------------*/
 
 conf_table_t conf_table[4] = {
-    {CONF_TYPE_INT,     "spacing",      N_("Icon spacing"),     NULL},
-    {CONF_TYPE_INT,     "max_width",    N_("Max item width"),   NULL},
-    {CONF_TYPE_BOOL,    "icons_only",   N_("Show only icons"),  NULL},
-    {CONF_TYPE_NONE,    NULL,           NULL,                   NULL}
+    {CONF_TYPE_INT,     "max_width",    N_("Maximum width of task button"), NULL},
+    {CONF_TYPE_BOOL,    "icons_only",   N_("Show only icons"),              NULL},
+    {CONF_TYPE_INT,     "spacing",      N_("Item spacing"),                 NULL},
+    {CONF_TYPE_NONE,    NULL,           NULL,                               NULL}
 };
 
 /*----------------------------------------------------------------------------*/
@@ -65,6 +65,7 @@ static void minimise_app (GtkWidget *, gpointer userdata);
 static void unminimise_app (GtkWidget *, gpointer userdata);
 static void create_button (WinlistPlugin *wl, WindowItem *item);
 static void destroy_button (WindowItem *item);
+static gboolean update_button_state (WindowItem *item);
 static void free_list_item (gpointer data);
 static float score_match (const char *str1, const char *str2);
 static char *get_exe (const char *cmdline);
@@ -183,14 +184,7 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
     while (list)
     {
         item = (WindowItem *) list->data;
-        if (item->btn)
-        {
-            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_pressed), item);
-            g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_release), item);
-            gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
-            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_pressed), item);
-            g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_release), item);
-        }
+        if (item->btn) update_button_state (item);
         list = g_list_next (list);
     }
 }
@@ -240,7 +234,11 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
         WindowItem *item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
-            if (!item->btn && item->title && item->app_id && !item->parent) create_button (wl, item);
+            if (!item->btn && item->title && item->app_id && !item->parent)
+            {
+                create_button (wl, item);
+                update_button_state (item);
+            }
             break;
         }
         list = g_list_next (list);
@@ -355,17 +353,19 @@ static void unminimise_app (GtkWidget *, gpointer userdata)
 static void create_button (WinlistPlugin *wl, WindowItem *item)
 {
     item->btn = gtk_toggle_button_new ();
-    item->gesture = add_long_press (item->btn, G_CALLBACK (handle_gesture_end), item);
+
     g_signal_connect (item->btn, "button-press-event", G_CALLBACK (handle_button_pressed), wl);
     g_signal_connect (item->btn, "button-release-event", G_CALLBACK (handle_button_release), item);
+
+    item->gesture = add_long_press (item->btn, G_CALLBACK (handle_gesture_end), item);
 
     item->dgesture = gtk_gesture_drag_new (item->btn);
     g_signal_connect (item->dgesture, "drag-begin", G_CALLBACK (handle_drag_begin), wl);
     g_signal_connect (item->dgesture, "drag-update", G_CALLBACK (handle_drag_update), wl);
     g_signal_connect (item->dgesture, "drag-end", G_CALLBACK (handle_drag_end), wl);
 
-    set_icon_and_title (wl, item);
     gtk_container_add (GTK_CONTAINER (wl->box), item->btn);
+    set_icon_and_title (wl, item);
     gtk_widget_show_all (wl->plugin);
 
     g_idle_add (idle_resize, wl);
@@ -383,6 +383,16 @@ static void destroy_button (WindowItem *item)
     item->btn = NULL;
     item->gesture = NULL;
     item->dgesture = NULL;
+}
+
+static gboolean update_button_state (WindowItem *item)
+{
+    g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_pressed), item);
+    g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_release), item);
+    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
+    g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_pressed), item);
+    g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_release), item);
+    return FALSE;
 }
 
 static void free_list_item (gpointer data)
@@ -494,7 +504,7 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
             iter = iter->next;
             continue;
         }
-        else g_free (info);
+        else g_object_unref (info);
 
         // strip the .desktop from the end for matching purposes
         *strrchr (id, '.') = 0;
@@ -567,7 +577,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
         // the desktop file name is valid, so just get the icon from it
         ic = g_app_info_get_icon (info);
         str = g_icon_to_string (ic);
-        g_free (info);
+        g_object_unref (info);
     }
     else
     {
@@ -586,30 +596,34 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowItem *item)
         else str = NULL;
     }
 
-    item->icon = gtk_image_new ();
-    wrap_set_taskbar_icon (wl, item->icon, str);
-    g_free (str);
-
     if (wl->icons_only)
     {
+        item->icon = gtk_image_new ();
         gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
+        wrap_set_taskbar_icon (wl, item->icon, str);
+
         gtk_widget_set_size_request (item->btn, -1, -1);
     }
     else
     {
+        box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
+        gtk_container_add (GTK_CONTAINER (item->btn), box);
+
+        item->icon = gtk_image_new ();
+        gtk_container_add (GTK_CONTAINER (box), item->icon);
+        wrap_set_taskbar_icon (wl, item->icon, str);
+
         item->label = gtk_label_new (item->title);
         gtk_label_set_xalign (GTK_LABEL (item->label), 0.0);
-
-        box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
-        gtk_container_add (GTK_CONTAINER (box), item->icon);
         gtk_container_add (GTK_CONTAINER (box), item->label);
-        gtk_container_add (GTK_CONTAINER (item->btn), box);
 
         gtk_widget_show_all (box);
 
         update_item_width (wl, item);
     }
     gtk_widget_show_all (item->btn);
+
+    g_free (str);
 
     if (item->title) gtk_widget_set_tooltip_text (item->btn, item->title);
 }
@@ -780,7 +794,7 @@ static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event,
 
     if (win->plugin->dragon)
     {
-        win->plugin->dragon = FALSE;
+        g_idle_add ((GSourceFunc) update_button_state, win);
         return FALSE;
     }
 
@@ -826,6 +840,7 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble, gpointer u
     if (!wl->dragon && x < DRAG_THRESH && x > -DRAG_THRESH) return;
 
     wl->dragon = TRUE;
+    pressed = PRESS_NONE;
     gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), wl->drag);
     sc = gtk_widget_get_style_context (wl->dragbtn);
     gtk_style_context_add_class (sc, "drag");
@@ -856,6 +871,8 @@ static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userda
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GtkStyleContext *sc;
+
+    if (!wl->dragon) return;
 
     wl->dragon = FALSE;
     gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), NULL);
