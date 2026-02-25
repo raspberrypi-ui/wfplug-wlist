@@ -206,35 +206,30 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         {
             if (!item->parent)
             {
-                btns = wl->buttons;
-                while (btns)
+                btn = find_btn (wl, item);
+                if (btn)
                 {
-                    btn = (WindowBtn *) btns->data;
-                    if (!g_strcmp0 (btn->app_id, item->app_id))
+                    btn->windows--;
+                    if (!btn->windows)
                     {
-                        btn->windows--;
-                        if (!btn->windows)
-                        {
-                            destroy_button (btn);
-                            wl->buttons = g_list_delete_link (wl->buttons, btns);
-                        }
-                        else if (btn->windows == 1)
-                        {
-                            list = wl->windows;
-                            while (list)
-                            {
-                                item = (WindowItem *) list->data;
-                                if (!g_strcmp0 (item->app_id, btn->app_id))
-                                {
-                                     gtk_label_set_text (GTK_LABEL (btn->label), item->title);
-                                     break;
-                                }
-                                list = g_list_next (list);
-                            }
-                        }
-                        break;
+                        destroy_button (btn);
+                        btns = g_list_find (wl->buttons, btn);
+                        wl->buttons = g_list_delete_link (wl->buttons, btns);
                     }
-                    btns = g_list_next (btns);
+                    else if (btn->windows == 1)
+                    {
+                        list = wl->windows;
+                        while (list)
+                        {
+                            item = (WindowItem *) list->data;
+                            if (!g_strcmp0 (item->app_id, btn->app_id))
+                            {
+                                 gtk_label_set_text (GTK_LABEL (btn->label), item->title);
+                                 break;
+                            }
+                            list = g_list_next (list);
+                        }
+                    }
                 }
             }
             if (item->title) g_free (item->title);
@@ -264,7 +259,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
     WindowBtn *btn;
-    GList *list, *btns;
+    GList *list;
 
     list = wl->windows;
     while (list)
@@ -277,40 +272,27 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                 if (item->plugin)
                 {
                     // button already exists - update the title
-                    btns = wl->buttons;
-                    while (btns)
+                    btn = find_btn (wl, item);
+                    if (btn)
                     {
-                        btn = (WindowBtn *) btns->data;
-                        if (!g_strcmp0 (item->app_id, btn->app_id))
-                        {
-                            update_item_width (wl, btn);
-                            update_button_state (btn);
-                            break;
-                        }
-                        btns = g_list_next (btns);
+                        update_item_width (wl, btn);
+                        update_button_state (btn);
                     }
                 }
                 else
                 {
                     // new toplevel - look to see if its id is already associated with a button...
                     item->plugin = wl;
-                    btns = wl->buttons;
-                    while (btns)
+                    btn = find_btn (wl, item);
+                    if (btn)
                     {
-                        btn = (WindowBtn *) btns->data;
-                        if (!g_strcmp0 (item->app_id, btn->app_id))
-                        {
-                            // found a button already for this app_id - update with new title, state etc
-                            if (btn->label) gtk_label_set_text (GTK_LABEL (btn->label), _("<Multiple windows>"));
-                            btn->windows++;
-                            break;
-                        }
-                        btns = g_list_next (btns);
+                        // found a button already for this app_id - update with new title, state etc
+                        if (btn->label) gtk_label_set_text (GTK_LABEL (btn->label), _("<Multiple windows>"));
+                        btn->windows++;
                     }
-
-                    // ... and if not, create one
-                    if (!btns)
+                    else
                     {
+                        // ...and if not, create one
                         btn = g_new0 (WindowBtn, 1);
                         btn->app_id = g_strdup (item->app_id);
                         btn->windows = 1;
