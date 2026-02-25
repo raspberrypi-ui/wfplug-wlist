@@ -117,15 +117,7 @@ static void handle_toplevel_title (void *data, HANDLE_PTR handle, const char *ti
             {
                 g_free (item->title);
                 item->title = g_strdup (title);
-                WindowBtn *btn = find_btn (wl, item);
-                if (btn)
-                {
-                    //update_item_width (wl, item);
-                    if (btn->windows == 1) gtk_label_set_text (GTK_LABEL (btn->label), item->title);
-                    gtk_widget_set_tooltip_text (btn->btn, item->title);
-                }
             }
-            break;
         }
         list = g_list_next (list);
     }
@@ -170,11 +162,9 @@ static void handle_toplevel_parent (void *data, HANDLE_PTR handle, HANDLE_PTR pa
 static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_array *state)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
+    GList *list;
     int flags = 0;
     uint32_t *arr;
-    WindowItem *item;
-    WindowBtn *btn;
-    GList *list;
 
     wl_array_for_each (arr, state)
     {
@@ -191,20 +181,12 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
     list = wl->windows;
     while (list)
     {
-        item = (WindowItem *) list->data;
+        WindowItem *item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
             item->state = flags;
             break;
         }
-        list = g_list_next (list);
-    }
-
-    list = wl->buttons;
-    while (list)
-    {
-        btn = (WindowBtn *) list->data;
-        update_button_state (btn);
         list = g_list_next (list);
     }
 }
@@ -222,21 +204,38 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
-            btns = wl->buttons;
-            while (btns)
+            if (!item->parent)
             {
-                btn = (WindowBtn *) btns->data;
-                if (!g_strcmp0 (btn->app_id, item->app_id))
+                btns = wl->buttons;
+                while (btns)
                 {
-                    btn->windows--;
-                    if (!btn->windows)
+                    btn = (WindowBtn *) btns->data;
+                    if (!g_strcmp0 (btn->app_id, item->app_id))
                     {
-                        destroy_button (btn);
-                        wl->buttons = g_list_delete_link (wl->buttons, btns);
+                        btn->windows--;
+                        if (!btn->windows)
+                        {
+                            destroy_button (btn);
+                            wl->buttons = g_list_delete_link (wl->buttons, btns);
+                        }
+                        else if (btn->windows == 1)
+                        {
+                            list = wl->windows;
+                            while (list)
+                            {
+                                item = (WindowItem *) list->data;
+                                if (!g_strcmp0 (item->app_id, btn->app_id))
+                                {
+                                     gtk_label_set_text (GTK_LABEL (btn->label), item->title);
+                                     break;
+                                }
+                                list = g_list_next (list);
+                            }
+                        }
+                        break;
                     }
-                    break;
+                    btns = g_list_next (btns);
                 }
-                btns = g_list_next (btns);
             }
             if (item->title) g_free (item->title);
             if (item->app_id) g_free (item->app_id);
@@ -244,21 +243,6 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
             break;
         }
         list = g_list_next (list);
-    }
-
-    if (btn->windows == 1 && btn->label)
-    {
-        list = wl->windows;
-        while (list)
-        {
-            item = (WindowItem *) list->data;
-            if (!g_strcmp0 (item->app_id, btn->app_id))
-            {
-                 gtk_label_set_text (GTK_LABEL (btn->label), item->title);
-                 break;
-            }
-            list = g_list_next (list);
-        }
     }
 
     // force resize so buttons grow now there is more free space
@@ -288,34 +272,55 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
         WindowItem *item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
-            if (!item->plugin && item->title && item->app_id && !item->parent)
+            if (item->title && item->app_id && !item->parent)
             {
-                item->plugin = wl;
-                btns = wl->buttons;
-                while (btns)
+                if (item->plugin)
                 {
-                    btn = (WindowBtn *) btns->data;
-                    if (!g_strcmp0 (item->app_id, btn->app_id))
+                    // button already exists - update the title
+                    btns = wl->buttons;
+                    while (btns)
                     {
-                        // found a button already for this app_id - update with new title, state etc
-                        if (btn->label) gtk_label_set_text (GTK_LABEL (btn->label), _("<Multiple windows>"));
-                        btn->windows++;
-                        break;
+                        btn = (WindowBtn *) btns->data;
+                        if (!g_strcmp0 (item->app_id, btn->app_id))
+                        {
+                            update_item_width (wl, btn);
+                            update_button_state (btn);
+                            break;
+                        }
+                        btns = g_list_next (btns);
                     }
-                    btns = g_list_next (btns);
                 }
-
-                if (!btns)
+                else
                 {
-                    btn = g_new0 (WindowBtn, 1);
-                    btn->app_id = g_strdup (item->app_id);
-                    btn->windows = 1;
-                    btn->plugin = wl;
-                    create_button (wl, btn, item->title);
-                    gtk_widget_set_name (btn->btn, item->app_id);
-                    wl->buttons = g_list_prepend (wl->buttons, btn);
+                    // new toplevel - look to see if its id is already associated with a button...
+                    item->plugin = wl;
+                    btns = wl->buttons;
+                    while (btns)
+                    {
+                        btn = (WindowBtn *) btns->data;
+                        if (!g_strcmp0 (item->app_id, btn->app_id))
+                        {
+                            // found a button already for this app_id - update with new title, state etc
+                            if (btn->label) gtk_label_set_text (GTK_LABEL (btn->label), _("<Multiple windows>"));
+                            btn->windows++;
+                            break;
+                        }
+                        btns = g_list_next (btns);
+                    }
+
+                    // ... and if not, create one
+                    if (!btns)
+                    {
+                        btn = g_new0 (WindowBtn, 1);
+                        btn->app_id = g_strdup (item->app_id);
+                        btn->windows = 1;
+                        btn->plugin = wl;
+                        create_button (wl, btn, item->title);
+                        gtk_widget_set_name (btn->btn, item->app_id);
+                        wl->buttons = g_list_prepend (wl->buttons, btn);
+                    }
+                    update_button_state (btn);
                 }
-                update_button_state (btn);
             }
             break;
         }
@@ -792,7 +797,7 @@ static void update_item_width (WinlistPlugin *wl, WindowBtn *btn)
         while (list)
         {
             WindowItem *item = (WindowItem *) list->data;
-            if (!g_strcmp0 (item->app_id, btn->app_id))
+            if (!item->parent && !g_strcmp0 (item->app_id, btn->app_id))
             {
                  title = item->title;
                  break;
