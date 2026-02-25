@@ -173,6 +173,7 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
     int flags = 0;
     uint32_t *arr;
     WindowItem *item;
+    WindowBtn *btn;
     GList *list;
 
     wl_array_for_each (arr, state)
@@ -199,11 +200,11 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
         list = g_list_next (list);
     }
 
-    list = wl->windows;
+    list = wl->buttons;
     while (list)
     {
-        item = (WindowItem *) list->data;
-        //if (item->btn) update_button_state (item);
+        btn = (WindowBtn *) list->data;
+        update_button_state (btn);
         list = g_list_next (list);
     }
 }
@@ -278,8 +279,8 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
 static void handle_toplevel_done (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
+    WindowBtn *btn;
     GList *list, *btns;
-    gboolean found = FALSE;
 
     list = wl->windows;
     while (list)
@@ -293,20 +294,20 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                 btns = wl->buttons;
                 while (btns)
                 {
-                    WindowBtn *btn = (WindowBtn *) btns->data;
+                    btn = (WindowBtn *) btns->data;
                     if (!g_strcmp0 (item->app_id, btn->app_id))
                     {
                         // found a button already for this app_id - update with new title, state etc
-                        found = TRUE;
                         if (btn->label) gtk_label_set_text (GTK_LABEL (btn->label), _("<Multiple windows>"));
                         btn->windows++;
+                        break;
                     }
                     btns = g_list_next (btns);
                 }
 
-                if (!found)
+                if (!btns)
                 {
-                    WindowBtn *btn = g_new0 (WindowBtn, 1);
+                    btn = g_new0 (WindowBtn, 1);
                     btn->app_id = g_strdup (item->app_id);
                     btn->windows = 1;
                     btn->plugin = wl;
@@ -314,7 +315,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     gtk_widget_set_name (btn->btn, item->app_id);
                     wl->buttons = g_list_prepend (wl->buttons, btn);
                 }
-//                update_button_state (item);
+                update_button_state (btn);
             }
             break;
         }
@@ -518,13 +519,22 @@ static void destroy_button (WindowBtn *item)
     item->dgesture = NULL;
 }
 
-static gboolean update_button_state (WindowBtn *item)
+static gboolean update_button_state (WindowBtn *btn)
 {
-    g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_pressed), item);
-    g_signal_handlers_block_by_func (item->btn, G_CALLBACK (handle_button_release), item);
-    //gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (item->btn), item->state & STATE_ACTIVATED);
-    g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_pressed), item);
-    g_signal_handlers_unblock_by_func (item->btn, G_CALLBACK (handle_button_release), item);
+    gboolean active = FALSE;
+    GList *list = btn->plugin->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (!g_strcmp0 (gtk_widget_get_name (btn->btn), item->app_id) && item->state & STATE_ACTIVATED) active = TRUE;
+        list = list->next;
+    }
+
+    g_signal_handlers_block_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
+    g_signal_handlers_block_by_func (btn->btn, G_CALLBACK (handle_button_release), btn->plugin);
+    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (btn->btn), active);
+    g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
+    g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_release), btn->plugin);
     return FALSE;
 }
 
@@ -930,10 +940,10 @@ static gboolean idle_resize (gpointer userdata)
 /* Handlers                                                                   */
 /*----------------------------------------------------------------------------*/
 
-static gboolean handle_button_pressed (GtkWidget *self, GdkEventButton *, gpointer userdata)
+static gboolean handle_button_pressed (GtkWidget *wid, GdkEventButton *, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
-    wl->dragbtn = self;
+    wl->dragbtn = wid;
     pressed = PRESS_NONE;
     return FALSE;
 }
@@ -944,7 +954,17 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
 
     if (wl->dragon)
     {
-        g_idle_add ((GSourceFunc) update_button_state, wid);
+        GList *list = wl->buttons;
+        while (list)
+        {
+            WindowBtn *btn = (WindowBtn *) list->data;
+            if (btn->btn == wid)
+            {
+                g_idle_add ((GSourceFunc) update_button_state, btn);
+                break;
+            }
+            list = list->next;
+        }
         return FALSE;
     }
 
