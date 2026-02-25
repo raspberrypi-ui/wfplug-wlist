@@ -180,6 +180,63 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
     }
 }
 
+static void handle_toplevel_done (void *data, HANDLE_PTR handle)
+{
+    WinlistPlugin *wl = (WinlistPlugin*) data;
+    WindowBtn *btn;
+    GList *list;
+
+    list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (item->handle == (void *) handle)
+        {
+            if (item->title && item->app_id && !item->parent)
+            {
+                if (item->plugin)
+                {
+                    // button already exists - update the title
+                    btn = find_btn (wl, item);
+                    if (btn)
+                    {
+                        update_item_width (wl, btn);
+                        update_button_state (btn);
+                        set_tooltip (wl, btn);
+                    }
+                }
+                else
+                {
+                    // new toplevel - look to see if its id is already associated with a button...
+                    item->plugin = wl;
+                    btn = find_btn (wl, item);
+                    if (btn)
+                    {
+                        // found a button already for this app_id - update with new title, state etc
+                        btn->windows++;
+                        update_item_width (wl, btn);
+                    }
+                    else
+                    {
+                        // ...and if not, create one
+                        btn = g_new0 (WindowBtn, 1);
+                        btn->app_id = g_strdup (item->app_id);
+                        btn->windows = 1;
+                        btn->plugin = wl;
+                        create_button (wl, btn);
+                        gtk_widget_set_name (btn->btn, item->app_id);
+                        wl->buttons = g_list_prepend (wl->buttons, btn);
+                    }
+                    update_button_state (btn);
+                    set_tooltip (wl, btn);
+                }
+            }
+            break;
+        }
+        list = g_list_next (list);
+    }
+}
+
 static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
@@ -241,63 +298,6 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
     }
 
     g_idle_add (idle_resize, wl);
-}
-
-static void handle_toplevel_done (void *data, HANDLE_PTR handle)
-{
-    WinlistPlugin *wl = (WinlistPlugin*) data;
-    WindowBtn *btn;
-    GList *list;
-
-    list = wl->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (item->handle == (void *) handle)
-        {
-            if (item->title && item->app_id && !item->parent)
-            {
-                if (item->plugin)
-                {
-                    // button already exists - update the title
-                    btn = find_btn (wl, item);
-                    if (btn)
-                    {
-                        update_item_width (wl, btn);
-                        update_button_state (btn);
-                        set_tooltip (wl, btn);
-                    }
-                }
-                else
-                {
-                    // new toplevel - look to see if its id is already associated with a button...
-                    item->plugin = wl;
-                    btn = find_btn (wl, item);
-                    if (btn)
-                    {
-                        // found a button already for this app_id - update with new title, state etc
-                        btn->windows++;
-                        update_item_width (wl, btn);
-                    }
-                    else
-                    {
-                        // ...and if not, create one
-                        btn = g_new0 (WindowBtn, 1);
-                        btn->app_id = g_strdup (item->app_id);
-                        btn->windows = 1;
-                        btn->plugin = wl;
-                        create_button (wl, btn);
-                        gtk_widget_set_name (btn->btn, item->app_id);
-                        wl->buttons = g_list_prepend (wl->buttons, btn);
-                    }
-                    update_button_state (btn);
-                    set_tooltip (wl, btn);
-                }
-            }
-            break;
-        }
-        list = g_list_next (list);
-    }
 }
 
 static void handle_toplevel_output_enter (void *, HANDLE_PTR, struct wl_output *)
@@ -530,7 +530,6 @@ static gboolean update_button_state (WindowBtn *btn)
 static void free_list_item (gpointer data)
 {
     WindowItem *item = (WindowItem *) data;
-    //destroy_button (item);
     if (item->title) g_free (item->title);
     if (item->app_id) g_free (item->app_id);
 }
@@ -1124,6 +1123,8 @@ void wlist_destructor (gpointer user_data)
     /* Deallocate memory */
     if (wl->windows) g_list_free_full (wl->windows, (GDestroyNotify) free_list_item);
     wl->windows = NULL;
+    if (wl->buttons) g_list_free_full (wl->buttons, (GDestroyNotify) destroy_button);
+    wl->buttons = NULL;
     if (wl->box) gtk_widget_destroy (wl->box);
     wl->box = NULL;
     if (wl->drag) g_object_unref (wl->drag);
