@@ -194,7 +194,7 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
 static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
-    WindowItem *item;
+    WindowItem *item, *item2;
     WindowBtn *btn;
     GList *list, *btns;
 
@@ -218,16 +218,16 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                     }
                     else if (btn->windows == 1)
                     {
-                        list = wl->windows;
-                        while (list)
+                        btns = wl->windows;
+                        while (btns)
                         {
-                            item = (WindowItem *) list->data;
-                            if (!g_strcmp0 (item->app_id, btn->app_id))
+                            item2 = (WindowItem *) btns->data;
+                            if (!g_strcmp0 (item2->app_id, btn->app_id))
                             {
-                                 gtk_label_set_text (GTK_LABEL (btn->label), item->title);
+                                 gtk_label_set_text (GTK_LABEL (btn->label), item2->title);
                                  break;
                             }
-                            list = g_list_next (list);
+                            btns = g_list_next (btns);
                         }
                     }
                 }
@@ -241,15 +241,13 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
     }
 
     // force resize so buttons grow now there is more free space
-    if (!wl->icons_only)
+    btns = wl->buttons;
+    while (btns)
     {
-        btns = wl->buttons;
-        while (btns)
-        {
-            btn = (WindowBtn *) btns->data;
-            if (btn->btn) gtk_widget_set_size_request (btn->btn, wl->max_width, -1);
-            btns = g_list_next (btns);
-        }
+        btn = (WindowBtn *) btns->data;
+        update_button_state (btn);
+        if (!wl->icons_only && btn->btn) gtk_widget_set_size_request (btn->btn, wl->max_width, -1);
+        btns = g_list_next (btns);
     }
 
     g_idle_add (idle_resize, wl);
@@ -287,8 +285,9 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     if (btn)
                     {
                         // found a button already for this app_id - update with new title, state etc
-                        if (btn->label) gtk_label_set_text (GTK_LABEL (btn->label), _("<Multiple windows>"));
                         btn->windows++;
+                        update_item_width (wl, btn);
+                        update_button_state (btn);
                     }
                     else
                     {
@@ -300,8 +299,8 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                         create_button (wl, btn, item->title);
                         gtk_widget_set_name (btn->btn, item->app_id);
                         wl->buttons = g_list_prepend (wl->buttons, btn);
+                        update_button_state (btn);
                     }
-                    update_button_state (btn);
                 }
             }
             break;
