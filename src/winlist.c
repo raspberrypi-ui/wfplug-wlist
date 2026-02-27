@@ -42,6 +42,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define HANDLE_PTR struct zwlr_foreign_toplevel_handle_v1 *
 #define MANAGER_PTR struct zwlr_foreign_toplevel_manager_v1 *
 
+#define MAX_MENU_LEN 25
+
 /*----------------------------------------------------------------------------*/
 /* Global data                                                                */
 /*----------------------------------------------------------------------------*/
@@ -856,6 +858,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     int state = 0, count = 0;
     WindowItem *app;
     GList *list = wl->windows;
+    char *str;
 
     while (list)
     {
@@ -870,24 +873,32 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 
     menu = gtk_menu_new ();
 
-    if (count > 1)
+    list = wl->windows;
+    while (list)
     {
-        list = wl->windows;
-        while (list)
+        app = (WindowItem *) list->data;
+        if (!g_strcmp0 (app->app_id, id))
         {
-            app = (WindowItem *) list->data;
-            if (!g_strcmp0 (app->app_id, id))
-            {
+            if (strlen (app->title) <= MAX_MENU_LEN)
                 item = gtk_menu_item_new_with_label (app->title);
-                g_signal_connect (item, "activate", G_CALLBACK (activate_handle), (void *) app->handle);
-                gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+            else
+            {
+                str = g_strndup (app->title, MAX_MENU_LEN);
+                str[MAX_MENU_LEN - 1] = '.';
+                str[MAX_MENU_LEN - 2] = '.';
+                str[MAX_MENU_LEN - 3] = '.';
+                item = gtk_menu_item_new_with_label (str);
+                g_free (str);
             }
-            list = list->next;
+            g_signal_connect (item, "activate", G_CALLBACK (activate_handle), (void *) app->handle);
+            gtk_widget_set_tooltip_text (item, app->title);
+            gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
         }
-
-        item = gtk_separator_menu_item_new ();
-        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+        list = list->next;
     }
+
+    item = gtk_separator_menu_item_new ();
+    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
     if (state & STATE_MINIMISED)
     {
