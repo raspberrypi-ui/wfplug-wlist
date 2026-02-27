@@ -841,12 +841,24 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
 static void popup_menu (GtkWidget *widget, gpointer userdata)
 {
     GtkWidget *menu, *item;
-    WindowItem *win = (WindowItem *) userdata;
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
     const char *id = gtk_widget_get_name (widget);
+    int state = 0;
+    GList *list = wl->windows;
+
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (!g_strcmp0 (item->app_id, id))
+        {
+            state |= item->state;
+        }
+        list = list->next;
+    }
 
     menu = gtk_menu_new ();
 
-    if (win->state & STATE_MINIMISED)
+    if (state & STATE_MINIMISED)
     {
         item = gtk_menu_item_new_with_label (_("Unminimise"));
         gtk_widget_set_name (item, id);
@@ -860,7 +872,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     }
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-    if (win->state & STATE_MAXIMISED)
+    if (state & STATE_MAXIMISED)
     {
         item = gtk_menu_item_new_with_label (_("Unmaximise"));
         gtk_widget_set_name (item, id);
