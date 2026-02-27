@@ -884,9 +884,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
             else
             {
                 str = g_strndup (app->title, MAX_MENU_LEN);
-                str[MAX_MENU_LEN - 1] = '.';
-                str[MAX_MENU_LEN - 2] = '.';
-                str[MAX_MENU_LEN - 3] = '.';
+                sprintf (str + MAX_MENU_LEN - 3, "...");
                 item = gtk_menu_item_new_with_label (str);
                 g_free (str);
             }
@@ -976,16 +974,12 @@ static void update_icons (WinlistPlugin *wl)
     while (list)
     {
         item = (WindowBtn *) list->data;
-        //if (item->btn)
-        {
-            wl->item_width = wl->max_width;
-            //WindowBtn *btn = find_btn (wl, item);
-            if (wl->icons_only) gtk_widget_set_size_request (item->btn, -1, -1);
-            else gtk_widget_set_size_request (item->btn, wl->item_width, -1);
-            children = gtk_container_get_children (GTK_CONTAINER (item->btn));
-            g_list_free_full (children, (GDestroyNotify) gtk_widget_destroy);
-            set_icon_and_title (wl, item);
-        }
+        wl->item_width = wl->max_width;
+        if (wl->icons_only) gtk_widget_set_size_request (item->btn, -1, -1);
+        else gtk_widget_set_size_request (item->btn, wl->item_width, -1);
+        children = gtk_container_get_children (GTK_CONTAINER (item->btn));
+        g_list_free_full (children, (GDestroyNotify) gtk_widget_destroy);
+        set_icon_and_title (wl, item);
         list = g_list_next (list);
     }
 
