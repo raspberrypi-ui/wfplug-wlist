@@ -236,6 +236,12 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     set_tooltip (wl, btn);
                 }
             }
+            if (item->state & STATE_ACTIVATED)
+            {
+                // move this item to the front of the list if it is activated
+                wl->windows = g_list_remove_link (wl->windows, list);
+                wl->windows = g_list_concat (list, wl->windows);
+            }
             break;
         }
         list = g_list_next (list);
@@ -379,27 +385,14 @@ static void activate_app (GtkWidget *wid, gpointer userdata)
     struct wl_seat *wseat  = gdk_wayland_seat_get_wl_seat (seat);
 
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
-    GList *list = wl->windows;
-    HANDLE_PTR top = NULL;
-
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id) && item->state && STATE_ACTIVATED)
-            top = item->handle;
-        list = list->next;
-    }
-
-    list = wl->windows;
+    GList *list = g_list_last (wl->windows);
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
             zwlr_foreign_toplevel_handle_v1_activate (item->handle, wseat);
-        list = list->next;
+        list = list->prev;
     }
-
-    if (top) zwlr_foreign_toplevel_handle_v1_activate (top, wseat);
 }
 
 static void close_app (GtkWidget *wid, gpointer userdata)
