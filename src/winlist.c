@@ -236,7 +236,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     set_tooltip (wl, btn);
                 }
             }
-            if (item->state & STATE_ACTIVATED)
+            if (item->state & STATE_ACTIVATED && list != wl->windows)
             {
                 // move this item to the front of the list if it is activated
                 wl->windows = g_list_remove_link (wl->windows, list);
