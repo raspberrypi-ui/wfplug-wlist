@@ -63,6 +63,7 @@ static void maximise_app (GtkWidget *, gpointer userdata);
 static void unmaximise_app (GtkWidget *, gpointer userdata);
 static void minimise_app (GtkWidget *, gpointer userdata);
 static void unminimise_app (GtkWidget *, gpointer userdata);
+static void activate_handle (GtkWidget *, gpointer userdata);
 static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item);
 static void create_button (WinlistPlugin *wl, WindowBtn *item);
 static void destroy_button (WindowBtn *item);
@@ -465,6 +466,15 @@ static void unminimise_app (GtkWidget *wid, gpointer userdata)
     }
 }
 
+static void activate_handle (GtkWidget *, gpointer userdata)
+{
+    GdkDisplay *gdk_display = gdk_display_get_default ();
+    GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
+    struct wl_seat *wseat  = gdk_wayland_seat_get_wl_seat (seat);
+
+    zwlr_foreign_toplevel_handle_v1_activate ((HANDLE_PTR) userdata, wseat);
+}
+
 /*----------------------------------------------------------------------------*/
 /* Button management                                                          */
 /*----------------------------------------------------------------------------*/
@@ -843,20 +853,41 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     GtkWidget *menu, *item;
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     const char *id = gtk_widget_get_name (widget);
-    int state = 0;
+    int state = 0, count = 0;
+    WindowItem *app;
     GList *list = wl->windows;
 
     while (list)
     {
-        WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (item->app_id, id))
+        app = (WindowItem *) list->data;
+        if (!g_strcmp0 (app->app_id, id))
         {
-            state |= item->state;
+            state |= app->state;
+            count++;
         }
         list = list->next;
     }
 
     menu = gtk_menu_new ();
+
+    if (count > 1)
+    {
+        list = wl->windows;
+        while (list)
+        {
+            app = (WindowItem *) list->data;
+            if (!g_strcmp0 (app->app_id, id))
+            {
+                item = gtk_menu_item_new_with_label (app->title);
+                g_signal_connect (item, "activate", G_CALLBACK (activate_handle), (void *) app->handle);
+                gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+            }
+            list = list->next;
+        }
+
+        item = gtk_separator_menu_item_new ();
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    }
 
     if (state & STATE_MINIMISED)
     {
