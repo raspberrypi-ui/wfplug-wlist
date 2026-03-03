@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* Typedefs and macros                                                        */
 /*----------------------------------------------------------------------------*/
 
-#define PLUGIN_TITLE N_("New Window List")
+#define PLUGIN_TITLE N_("Icon Tasklist")
 
 #define STATE_ACTIVATED 0x01
 #define STATE_MAXIMISED 0x02

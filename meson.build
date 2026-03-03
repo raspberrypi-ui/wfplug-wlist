@@ -1,5 +1,5 @@
 project(
-    'newwinlist',
+    'tlist',
     'c',
     'cpp',
     meson_version: '>=0.60.0',
