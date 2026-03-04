@@ -1151,7 +1151,7 @@ void wlist_init (WinlistPlugin *wl)
 
     gboolean need_prefix = (g_getenv ("XDG_MENU_PREFIX") == NULL);
     wl->menu_cache = menu_cache_lookup (need_prefix ? "lxde-applications.menu+hidden" : "applications.menu+hidden");
-    menu_cache_add_reload_notify (wl->menu_cache, NULL, NULL);
+    wl->reload_notify = menu_cache_add_reload_notify (wl->menu_cache, NULL, NULL);
 
     GdkDisplay *gdk_display = gdk_display_get_default ();
     struct wl_display *display = gdk_wayland_display_get_wl_display (gdk_display);
@@ -1177,6 +1177,12 @@ void wlist_destructor (gpointer user_data)
     // stop the window manager
     g_list_foreach (wl->windows, (GFunc) close_handle, wl);
     if (wl->manager) zwlr_foreign_toplevel_manager_v1_stop (wl->manager);
+
+    if (wl->menu_cache)
+    {
+        menu_cache_remove_reload_notify (wl->menu_cache, wl->reload_notify);
+        // unref'ing the menu cache causes a segfault because its io thread isn't being closed...
+    }
 
     /* Deallocate memory */
     if (wl->windows) g_list_free_full (wl->windows, (GDestroyNotify) free_list_item);

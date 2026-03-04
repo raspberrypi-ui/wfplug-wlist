@@ -58,7 +58,9 @@ typedef struct
     gboolean dragon;
 
     struct zwlr_foreign_toplevel_manager_v1 *manager;
+
     MenuCache* menu_cache;
+    gpointer reload_notify;
 } WinlistPlugin;
 
 typedef struct
