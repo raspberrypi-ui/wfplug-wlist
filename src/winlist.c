@@ -855,7 +855,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     GtkWidget *menu, *item;
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     const char *id = gtk_widget_get_name (widget);
-    int state = 0, count = 0;
+    int state = 0x7, count = 0;
     WindowItem *app;
     GList *list = wl->windows;
     char *str;
@@ -865,7 +865,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         app = (WindowItem *) list->data;
         if (!g_strcmp0 (app->app_id, id))
         {
-            state |= app->state;
+            state &= app->state;
             count++;
         }
         list = list->next;
