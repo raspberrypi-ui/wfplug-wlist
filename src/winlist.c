@@ -852,20 +852,24 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
 
 static void popup_menu (GtkWidget *widget, gpointer userdata)
 {
-    GtkWidget *menu, *item;
+    GtkWidget *menu, *item, *label;
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     const char *id = gtk_widget_get_name (widget);
-    int state = 0x7, count = 0;
+    int count = 0;
     WindowItem *app;
     GList *list = wl->windows;
     char *str;
+    gboolean min = FALSE, max = FALSE, unmin = FALSE, unmax = FALSE;
 
     while (list)
     {
         app = (WindowItem *) list->data;
         if (!g_strcmp0 (app->app_id, id))
         {
-            state &= app->state;
+            if (app->state & STATE_MAXIMISED) unmax = TRUE;
+            else max = TRUE;
+            if (app->state & STATE_MINIMISED) unmin = TRUE;
+            else min = TRUE;
             count++;
         }
         list = list->next;
@@ -888,6 +892,20 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
                 item = gtk_menu_item_new_with_label (str);
                 g_free (str);
             }
+            if (app->state & STATE_MINIMISED)
+            {
+                label = gtk_bin_get_child (GTK_BIN (item));
+                str = g_strdup_printf ("<span color=\"#808080\">%s</span>", gtk_label_get_text (GTK_LABEL (label)));
+                gtk_label_set_markup (GTK_LABEL (label), str);
+                g_free (str);
+            }
+            if (app->state & STATE_MAXIMISED)
+            {
+                label = gtk_bin_get_child (GTK_BIN (item));
+                str = g_strdup_printf ("<b>%s</b>", gtk_label_get_label (GTK_LABEL (label)));
+                gtk_label_set_markup (GTK_LABEL (label), str);
+                g_free (str);
+            }
             g_signal_connect (item, "activate", G_CALLBACK (activate_handle), (void *) app->handle);
             gtk_widget_set_tooltip_text (item, app->title);
             gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
@@ -898,35 +916,45 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     item = gtk_separator_menu_item_new ();
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-    if (state & STATE_MINIMISED)
+    if (min)
     {
-        item = gtk_menu_item_new_with_label (_("Unminimise"));
-        gtk_widget_set_name (item, id);
-        g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), userdata);
-    }
-    else
-    {
-        item = gtk_menu_item_new_with_label (_("Minimise"));
+        item = gtk_menu_item_new_with_label (count > 1 ? _("Minimise All") : _("Minimise"));
         gtk_widget_set_name (item, id);
         g_signal_connect (item, "activate", G_CALLBACK (minimise_app), userdata);
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
+
+    if (unmin)
+    {
+        item = gtk_menu_item_new_with_label (count > 1 ? _("Unminimise All") : _("Unminimise"));
+        gtk_widget_set_name (item, id);
+        g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), userdata);
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    }
+
+    item = gtk_separator_menu_item_new ();
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-    if (state & STATE_MAXIMISED)
+    if (max)
     {
-        item = gtk_menu_item_new_with_label (_("Unmaximise"));
-        gtk_widget_set_name (item, id);
-        g_signal_connect (item, "activate", G_CALLBACK (unmaximise_app), userdata);
-    }
-    else
-    {
-        item = gtk_menu_item_new_with_label (_("Maximise"));
+        item = gtk_menu_item_new_with_label (count > 1 ? _("Maximise All") : _("Maximise"));
         gtk_widget_set_name (item, id);
         g_signal_connect (item, "activate", G_CALLBACK (maximise_app), userdata);
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
+
+    if (unmax)
+    {
+        item = gtk_menu_item_new_with_label (count > 1 ? _("Unmaximise All") : _("Unmaximise"));
+        gtk_widget_set_name (item, id);
+        g_signal_connect (item, "activate", G_CALLBACK (unmaximise_app), userdata);
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    }
+
+    item = gtk_separator_menu_item_new ();
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-    item = gtk_menu_item_new_with_label (_("Close"));
+    item = gtk_menu_item_new_with_label (count > 1 ? _("Close All") : _("Close"));
     gtk_widget_set_name (item, id);
     g_signal_connect (item, "activate", G_CALLBACK (close_app), userdata);
     gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
