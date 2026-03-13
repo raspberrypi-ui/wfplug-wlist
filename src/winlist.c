@@ -838,7 +838,7 @@ static void update_item_width (WinlistPlugin *wl, WindowBtn *btn)
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
 {
     const char *open, *close;
-    char *tip = NULL, *tmp;
+    char *tip = NULL, *tmp, *esc;
     GList *list = wl->windows;
 
     while (list)
@@ -866,8 +866,9 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
                 open = "";
                 close = "";
             }
-
-            tmp = g_strdup_printf ("%s%s%s%s%s", tip ? tip : "", tip ? "\n" : "", open, item->title, close);
+            esc = g_markup_escape_text (item->title, -1);
+            tmp = g_strdup_printf ("%s%s%s%s%s", tip ? tip : "", tip ? "\n" : "", open, esc, close);
+            g_free (esc);
             if (tip) g_free (tip);
             tip = tmp;
         }
@@ -886,7 +887,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     int count = 0;
     WindowItem *app;
     GList *list = wl->windows;
-    char *str;
+    char *str, *esc;
     gboolean min = FALSE, max = FALSE, unmin = FALSE, unmax = FALSE;
 
     while (list)
@@ -911,15 +912,18 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         app = (WindowItem *) list->data;
         if (!g_strcmp0 (app->app_id, id))
         {
-            if (strlen (app->title) <= MAX_MENU_LEN)
-                item = gtk_menu_item_new_with_label (app->title);
+            esc = g_markup_escape_text (app->title, -1);
+            if (strlen (esc) <= MAX_MENU_LEN)
+                item = gtk_menu_item_new_with_label (esc);
             else
             {
-                str = g_strndup (app->title, MAX_MENU_LEN);
+                str = g_strndup (esc, MAX_MENU_LEN);
                 sprintf (str + MAX_MENU_LEN - 3, "...");
                 item = gtk_menu_item_new_with_label (str);
                 g_free (str);
             }
+            g_free (esc);
+
             if (app->state & STATE_MINIMISED)
             {
                 label = gtk_bin_get_child (GTK_BIN (item));
