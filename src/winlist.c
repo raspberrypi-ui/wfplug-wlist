@@ -421,7 +421,10 @@ static void maximise_app (GtkWidget *wid, gpointer userdata)
     {
         WindowItem *item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        {
+            zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
             zwlr_foreign_toplevel_handle_v1_set_maximized (item->handle);
+        }
         list = list->next;
     }
 }
@@ -435,7 +438,10 @@ static void unmaximise_app (GtkWidget *wid, gpointer userdata)
     {
         WindowItem *item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        {
+            zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
             zwlr_foreign_toplevel_handle_v1_unset_maximized (item->handle);
+        }
         list = list->next;
     }
 }
@@ -895,7 +901,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
             if (app->state & STATE_MINIMISED)
             {
                 label = gtk_bin_get_child (GTK_BIN (item));
-                str = g_strdup_printf ("<span color=\"#808080\">%s</span>", gtk_label_get_text (GTK_LABEL (label)));
+                str = g_strdup_printf ("<i>%s</i>", gtk_label_get_text (GTK_LABEL (label)));
                 gtk_label_set_markup (GTK_LABEL (label), str);
                 g_free (str);
             }
@@ -918,7 +924,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 
     if (min)
     {
-        item = gtk_menu_item_new_with_label (count > 1 ? _("Minimise All") : _("Minimise"));
+        item = gtk_menu_item_new_with_label (count > 1 ? _("Hide All") : _("Hide"));
         gtk_widget_set_name (item, id);
         g_signal_connect (item, "activate", G_CALLBACK (minimise_app), userdata);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
@@ -926,29 +932,29 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 
     if (unmin)
     {
-        item = gtk_menu_item_new_with_label (count > 1 ? _("Unminimise All") : _("Unminimise"));
+        item = gtk_menu_item_new_with_label (count > 1 ? _("Show All") : _("Show"));
         gtk_widget_set_name (item, id);
         g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), userdata);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
 
-    item = gtk_separator_menu_item_new ();
-    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
-
-    if (max)
+    if (count == 1)
     {
-        item = gtk_menu_item_new_with_label (count > 1 ? _("Maximise All") : _("Maximise"));
-        gtk_widget_set_name (item, id);
-        g_signal_connect (item, "activate", G_CALLBACK (maximise_app), userdata);
-        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
-    }
+        if (max)
+        {
+            item = gtk_menu_item_new_with_label (_("Maximise"));
+            gtk_widget_set_name (item, id);
+            g_signal_connect (item, "activate", G_CALLBACK (maximise_app), userdata);
+            gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+        }
 
-    if (unmax)
-    {
-        item = gtk_menu_item_new_with_label (count > 1 ? _("Unmaximise All") : _("Unmaximise"));
-        gtk_widget_set_name (item, id);
-        g_signal_connect (item, "activate", G_CALLBACK (unmaximise_app), userdata);
-        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+        if (unmax)
+        {
+            item = gtk_menu_item_new_with_label (_("Unmaximise"));
+            gtk_widget_set_name (item, id);
+            g_signal_connect (item, "activate", G_CALLBACK (unmaximise_app), userdata);
+            gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+        }
     }
 
     item = gtk_separator_menu_item_new ();
