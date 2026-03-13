@@ -837,6 +837,7 @@ static void update_item_width (WinlistPlugin *wl, WindowBtn *btn)
 
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
 {
+    const char *open, *close;
     char *tip = NULL, *tmp;
     GList *list = wl->windows;
 
@@ -845,14 +846,35 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
         WindowItem *item = (WindowItem *) list->data;
         if (!g_strcmp0 (item->app_id, btn->app_id))
         {
-            tmp = g_strdup_printf ("%s%s%s", tip ? tip : "", tip ? "\n" : "", item->title);
+            if (item->state & STATE_MINIMISED && item->state & STATE_MAXIMISED)
+            {
+                open = "<b><i>";
+                close = "</i></b>";
+            }
+            else if (item->state & STATE_MINIMISED)
+            {
+                open = "<i>";
+                close = "</i>";
+            }
+            else if (item->state & STATE_MAXIMISED)
+            {
+                open = "<b>";
+                close = "</b>";
+            }
+            else
+            {
+                open = "";
+                close = "";
+            }
+
+            tmp = g_strdup_printf ("%s%s%s%s%s", tip ? tip : "", tip ? "\n" : "", open, item->title, close);
             if (tip) g_free (tip);
             tip = tmp;
         }
         list = list->next;
     }
 
-    gtk_widget_set_tooltip_text (btn->btn, tip);
+    gtk_widget_set_tooltip_markup (btn->btn, tip);
     g_free (tip);
 }
 
