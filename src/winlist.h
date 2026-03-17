@@ -47,6 +47,8 @@ typedef struct
 
     GList *windows;
 
+    char *launchers;                /* List of launchers */
+
     int spacing;
     int max_width;
     int item_width;
@@ -83,6 +85,7 @@ typedef struct
     GtkWidget *label;
     GtkGesture *gesture;
     GtkGesture *dgesture;
+    gboolean launcher;
 } WindowBtn;
 
 

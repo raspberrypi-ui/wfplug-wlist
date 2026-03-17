@@ -235,6 +235,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                         btn->app_id = g_strdup (item->app_id);
                         btn->windows = 1;
                         btn->plugin = wl;
+                        btn->launcher = FALSE;
                         create_button (wl, btn);
                         gtk_widget_set_name (btn->btn, item->app_id);
                         wl->buttons = g_list_prepend (wl->buttons, btn);
@@ -274,7 +275,7 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                 if (btn)
                 {
                     btn->windows--;
-                    if (!btn->windows)
+                    if (!btn->windows && !btn->launcher)
                     {
                         destroy_button (btn);
                         btns = g_list_find (wl->buttons, btn);
@@ -773,6 +774,8 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
         cairo_surface_t *surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
         cairo_t *cr = cairo_create (surf);
 
+        if (item->windows)
+        {
         dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
         radius = dim / 6;
         if (dim == 48) fsize = 10;
@@ -791,6 +794,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
         cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
         cairo_show_text (cr, buf);
         g_free (buf);
+        }
 
         gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
         cairo_surface_destroy (surf);
@@ -1107,23 +1111,31 @@ static gboolean handle_button_pressed (GtkWidget *wid, GdkEventButton *, gpointe
     return FALSE;
 }
 
+static void launch_id (GtkWidget *widget)
+{
+    char *str = g_strdup_printf ("%s.desktop", gtk_widget_get_name (widget));
+    GAppInfo *info = (GAppInfo *) g_desktop_app_info_new (str);
+    g_free (str);
+    g_app_info_launch (info, NULL, NULL, NULL);
+    g_object_unref (info);
+}
+
 static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    WindowBtn *btn;
+
+    GList *list = wl->buttons;
+    while (list)
+    {
+        btn = (WindowBtn *) list->data;
+        if (btn->btn == wid) break;
+        list = list->next;
+    }
 
     if (wl->dragon)
     {
-        GList *list = wl->buttons;
-        while (list)
-        {
-            WindowBtn *btn = (WindowBtn *) list->data;
-            if (btn->btn == wid)
-            {
-                g_idle_add ((GSourceFunc) update_button_state, btn);
-                break;
-            }
-            list = list->next;
-        }
+        g_idle_add ((GSourceFunc) update_button_state, btn);
         return FALSE;
     }
 
@@ -1131,7 +1143,8 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
 
     switch (event->button)
     {
-        case 1:     activate_app (wid, userdata);
+        case 1:     if (btn->windows) activate_app (wid, userdata);
+                    else launch_id (wid);
                     return FALSE;
 
         case 3:     popup_menu (wid, userdata);
@@ -1209,6 +1222,34 @@ static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userda
     gtk_style_context_remove_class (sc, "drag");
 }
 
+static void add_launcher (WinlistPlugin *wl, char *id)
+{
+    WindowBtn *wbtn;
+
+    wbtn = g_new0 (WindowBtn, 1);
+    wbtn->app_id = g_strdup (id);
+    wbtn->windows = 0;
+    wbtn->plugin = wl;
+    wbtn->launcher = TRUE;
+    create_button (wl, wbtn);
+    gtk_widget_set_name (wbtn->btn, id);
+    wl->buttons = g_list_prepend (wl->buttons, wbtn);
+}
+
+static void load_launchers (WinlistPlugin *wl)
+{
+    char *lstr, *launcher;
+
+    lstr = g_strdup (wl->launchers);
+    launcher = strtok (lstr, " ");
+    while (launcher)
+    {
+        add_launcher (wl, launcher);
+        launcher = strtok (NULL, " ");
+    }
+    g_free (lstr);
+}
+
 /*----------------------------------------------------------------------------*/
 /* wf-panel plugin functions                                                  */
 /*----------------------------------------------------------------------------*/
@@ -1254,6 +1295,9 @@ void wlist_init (WinlistPlugin *wl)
     wl_registry_add_listener (registry, &registry_listener, wl);
     wl_display_roundtrip (display);
     wl_registry_destroy (registry);
+
+    /* Load the launchers */
+    load_launchers (wl);
 
     if (wl->manager) zwlr_foreign_toplevel_manager_v1_add_listener (wl->manager, &toplevel_manager_v1, wl);
 }

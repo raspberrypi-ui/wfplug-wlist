@@ -47,6 +47,7 @@ class WayfireWinlist : public WayfireWidget
     WfOption <int> spacing {"panel/tlist_spacing"};
     WfOption <int> max_width {"panel/tlist_max_width"};
     WfOption <bool> icons_only {"panel/tlist_icons_only"};
+    WfOption <std::string> launchers {"panel/launchers"};
 
     /* plugin */
     WinlistPlugin *wl;

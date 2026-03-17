@@ -4,7 +4,6 @@
 	<_short>Panel</_short>
 	<group>
 	<_short>Window List</_short>
-	<_short>Window List</_short>
 	<option name="tlist_max_width" type="int">
 		<_short>Window List Maximum Task Width</_short>
 		<default>200</default>
@@ -16,6 +15,10 @@
 	<option name="tlist_icons_only" type="bool">
 		<_short>Window List Icons Only</_short>
 		<default>true</default>
+	</option>
+	<option name="launchers" type="string">
+		<_short>Launchers</_short>
+		<default></default>
 	</option>
 	</group>
 	</plugin>
