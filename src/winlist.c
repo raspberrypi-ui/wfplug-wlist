@@ -210,6 +210,8 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     {
                         update_item_width (wl, btn);
                         update_button_state (btn);
+                        gtk_widget_destroy (btn->icon);
+                        set_icon_and_title (wl, btn);
                         set_tooltip (wl, btn);
                     }
                 }
@@ -276,7 +278,7 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                         btns = g_list_find (wl->buttons, btn);
                         wl->buttons = g_list_delete_link (wl->buttons, btns);
                     }
-                    else if (btn->windows == 1)
+                    else
                     {
                         btns = wl->windows;
                         while (btns)
@@ -284,8 +286,10 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                             item2 = (WindowItem *) btns->data;
                             if (!g_strcmp0 (item2->app_id, btn->app_id))
                             {
-                                 gtk_label_set_text (GTK_LABEL (btn->label), item2->title);
-                                 break;
+                                if (btn->windows == 1) gtk_label_set_text (GTK_LABEL (btn->label), item2->title);
+                                gtk_widget_destroy (btn->icon);
+                                set_icon_and_title (wl, btn);
+                                break;
                             }
                             btns = g_list_next (btns);
                         }
@@ -759,7 +763,39 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
     {
         item->icon = gtk_image_new ();
         gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
-        wrap_set_taskbar_icon (wl, item->icon, str);
+//        wrap_set_taskbar_icon (wl, item->icon, str);
+
+        GdkPixbuf *pb = load_taskbar_pixbuf (item->icon, str);
+        cairo_surface_t *surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
+        cairo_t *cr = cairo_create (surf);
+
+        int dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
+		int fsize;
+		if (dim == 48) fsize = 10;
+		if (dim == 32) fsize = 7;
+		if (dim == 24) fsize = 5;
+		if (dim == 16) fsize = 3;
+
+        cairo_set_source_rgb (cr, 1,1,1);
+        cairo_arc (cr, dim - (dim / 6), dim - (dim / 6), dim / 6, 0, 6.3);
+        cairo_fill (cr);
+        cairo_set_source_rgb (cr, 0, 0, 0);
+
+        //cairo_arc (cr, dim - (dim / 6), dim - (dim / 6), dim / 6, 0, 6.3);
+        //cairo_set_line_width (cr, 0.5);
+        //cairo_stroke (cr);
+
+        //if (item->windows > 1)
+        {
+            cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+            cairo_set_font_size (cr, fsize);
+            cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
+            char *buf = g_strdup_printf ("%d", item->windows);
+            cairo_show_text (cr, buf);
+            g_free (buf);
+        }
+        gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
+        cairo_surface_destroy (surf);
 
         gtk_widget_set_size_request (item->btn, -1, -1);
     }
