@@ -225,6 +225,8 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                         // found a button already for this app_id - update with new title, state etc
                         btn->windows++;
                         update_item_width (wl, btn);
+                        gtk_widget_destroy (btn->icon);
+                        set_icon_and_title (wl, btn);
                     }
                     else
                     {
