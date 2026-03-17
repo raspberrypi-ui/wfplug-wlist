@@ -763,39 +763,35 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
 
     if (wl->icons_only)
     {
+        int fsize, dim, radius;
+        char *buf;
+
         item->icon = gtk_image_new ();
         gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
-//        wrap_set_taskbar_icon (wl, item->icon, str);
 
         GdkPixbuf *pb = load_taskbar_pixbuf (item->icon, str);
         cairo_surface_t *surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
         cairo_t *cr = cairo_create (surf);
 
-        int dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
-		int fsize;
-		if (dim == 48) fsize = 10;
-		if (dim == 32) fsize = 7;
-		if (dim == 24) fsize = 5;
-		if (dim == 16) fsize = 3;
+        dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
+        radius = dim / 6;
+        if (dim == 48) fsize = 10;
+        if (dim == 32) fsize = 7;
+        if (dim == 24) fsize = 5;
+        if (dim == 16) fsize = 3;
 
-        cairo_set_source_rgb (cr, 1,1,1);
-        cairo_arc (cr, dim - (dim / 6), dim - (dim / 6), dim / 6, 0, 6.3);
+        cairo_set_source_rgb (cr, 1 ,1, 1);
+        cairo_arc (cr, dim - radius, dim - radius, radius, 0, 6.3);
         cairo_fill (cr);
+
+        buf = g_strdup_printf ("%d", item->windows < 10 ? item->windows : 9);
         cairo_set_source_rgb (cr, 0, 0, 0);
+        cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_set_font_size (cr, fsize);
+        cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
+        cairo_show_text (cr, buf);
+        g_free (buf);
 
-        //cairo_arc (cr, dim - (dim / 6), dim - (dim / 6), dim / 6, 0, 6.3);
-        //cairo_set_line_width (cr, 0.5);
-        //cairo_stroke (cr);
-
-        //if (item->windows > 1)
-        {
-            cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-            cairo_set_font_size (cr, fsize);
-            cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
-            char *buf = g_strdup_printf ("%d", item->windows);
-            cairo_show_text (cr, buf);
-            g_free (buf);
-        }
         gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
         cairo_surface_destroy (surf);
 
