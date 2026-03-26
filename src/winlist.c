@@ -89,6 +89,9 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
 static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_update (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
+static void launch_id (GtkWidget *widget);
+static void add_launcher (WinlistPlugin *wl, char *id);
+static void load_launchers (WinlistPlugin *wl);
 
 /*----------------------------------------------------------------------------*/
 /* Wayland protocol interface                                                 */
@@ -1048,6 +1051,14 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
 
+    item = gtk_separator_menu_item_new ();
+    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+
+    item = gtk_menu_item_new_with_label (_("Launch"));
+    gtk_widget_set_name (item, id);
+    g_signal_connect (item, "activate", G_CALLBACK (launch_id), item);
+    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+
     gtk_widget_show_all (menu);
     wrap_show_menu (widget, menu);
 }
@@ -1084,6 +1095,59 @@ static void update_widths (WinlistPlugin *wl, int width)
 
 static void update_icons (WinlistPlugin *wl)
 {
+    WindowBtn *btn;
+    GList *list;
+
+    // delete the existing widgets
+    list = wl->buttons;
+    while (list)
+    {
+        btn = (WindowBtn *) list->data;
+        gtk_widget_destroy (btn->btn);
+        list = list->next;
+    }
+
+    // clear the list of buttons
+    g_list_free (wl->buttons);
+    wl->buttons = NULL;
+
+    // first load the launchers
+    load_launchers (wl);
+
+    // then go through the list of open windows, adding icons to launchers or adding new icons accordingly
+    list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+
+        // new toplevel - look to see if its id is already associated with a button...
+        btn = find_btn (wl, item);
+        if (btn)
+        {
+            // found a button already for this app_id - update with new title, state etc
+            btn->windows++;
+            update_item_width (wl, btn);
+            gtk_widget_destroy (btn->icon);
+            set_icon_and_title (wl, btn);
+        }
+        else
+        {
+            // ...and if not, create one
+            btn = g_new0 (WindowBtn, 1);
+            btn->app_id = g_strdup (item->app_id);
+            btn->windows = 1;
+            btn->plugin = wl;
+            btn->launcher = FALSE;
+            create_button (wl, btn);
+            gtk_widget_set_name (btn->btn, item->app_id);
+            wl->buttons = g_list_prepend (wl->buttons, btn);
+        }
+        update_button_state (btn);
+        set_tooltip (wl, btn);
+
+        list = list->next;
+    }
+#if 0
     WindowBtn *item;
     GList *list, *children;
 
@@ -1102,6 +1166,7 @@ static void update_icons (WinlistPlugin *wl)
 
     gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
     gtk_widget_queue_allocate (wl->plugin);
+#endif
 }
 
 static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer userdata)
@@ -1128,15 +1193,6 @@ static gboolean handle_button_pressed (GtkWidget *wid, GdkEventButton *, gpointe
     wl->dragbtn = wid;
     pressed = PRESS_NONE;
     return FALSE;
-}
-
-static void launch_id (GtkWidget *widget)
-{
-    char *str = g_strdup_printf ("%s.desktop", gtk_widget_get_name (widget));
-    GAppInfo *info = (GAppInfo *) g_desktop_app_info_new (str);
-    g_free (str);
-    g_app_info_launch (info, NULL, NULL, NULL);
-    g_object_unref (info);
 }
 
 static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gpointer userdata)
@@ -1239,6 +1295,15 @@ static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userda
     gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), NULL);
     sc = gtk_widget_get_style_context (wl->dragbtn);
     gtk_style_context_remove_class (sc, "drag");
+}
+
+static void launch_id (GtkWidget *widget)
+{
+    char *str = g_strdup_printf ("%s.desktop", gtk_widget_get_name (widget));
+    GAppInfo *info = (GAppInfo *) g_desktop_app_info_new (str);
+    g_free (str);
+    g_app_info_launch (info, NULL, NULL, NULL);
+    g_object_unref (info);
 }
 
 static void add_launcher (WinlistPlugin *wl, char *id)
