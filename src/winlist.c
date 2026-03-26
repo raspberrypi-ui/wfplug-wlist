@@ -414,6 +414,45 @@ static void activate_app (GtkWidget *wid, gpointer userdata)
     }
 }
 
+static void toggle_app (GtkWidget *wid, gpointer userdata)
+{
+    GdkDisplay *gdk_display = gdk_display_get_default ();
+    GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
+    struct wl_seat *wseat  = gdk_wayland_seat_get_wl_seat (seat);
+
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    gboolean min = FALSE, act = FALSE;
+    GList *list;
+    WindowItem *item;
+
+    list = g_list_last (wl->windows);
+    while (list)
+    {
+        item = (WindowItem *) list->data;
+        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        {
+            // if any window is minimised, activate
+            // if all windows are unminimised but none are activated, activate
+            // if all windows are visible and one is active, minimise all
+            if (item->state & STATE_MINIMISED) min = TRUE;  // at least one window minimised
+            if (item->state & STATE_ACTIVATED) act = TRUE;  // one window is activated
+        }
+        list = list->prev;
+    }
+
+    list = g_list_last (wl->windows);
+    while (list)
+    {
+        item = (WindowItem *) list->data;
+        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        {
+            if (min || !act) zwlr_foreign_toplevel_handle_v1_activate (item->handle, wseat);
+            else zwlr_foreign_toplevel_handle_v1_set_minimized (item->handle);
+        }
+        list = list->prev;
+    }
+}
+
 static void close_app (GtkWidget *wid, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
@@ -1072,7 +1111,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         item = gtk_separator_menu_item_new ();
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-        item = gtk_menu_item_new_with_label (_("Launch"));
+        item = gtk_menu_item_new_with_label (count ? _("New Window") : _("Launch"));
         gtk_widget_set_name (item, btn->launch_id);
         g_signal_connect (item, "activate", G_CALLBACK (launch_id), item);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
@@ -1239,7 +1278,7 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
 
     switch (event->button)
     {
-        case 1:     if (btn->windows) activate_app (wid, userdata);
+        case 1:     if (btn->windows) toggle_app (wid, userdata);
                     else launch_id (wid);
                     return FALSE;
 
