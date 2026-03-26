@@ -231,6 +231,8 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                         update_item_width (wl, btn);
                         gtk_widget_destroy (btn->icon);
                         set_icon_and_title (wl, btn);
+                        btn->app_id = g_strdup (item->app_id);
+                        gtk_widget_set_name (btn->btn, item->app_id);
                     }
                     else
                     {
@@ -291,13 +293,16 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                         while (btns)
                         {
                             item2 = (WindowItem *) btns->data;
-                            if (!g_strcmp0 (item2->app_id, btn->app_id))
+                            char *mcid = menu_cache_id (wl, item2->app_id);
+                            if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (item2->app_id, btn->app_id))
                             {
                                 if (btn->windows == 1) gtk_label_set_text (GTK_LABEL (btn->label), item2->title);
                                 gtk_widget_destroy (btn->icon);
                                 set_icon_and_title (wl, btn);
+                                gtk_widget_set_name (btn->btn, btn->launch_id);
                                 break;
                             }
+                            g_free (mcid);
                             btns = g_list_next (btns);
                         }
                     }
@@ -501,12 +506,18 @@ static void activate_handle (GtkWidget *, gpointer userdata)
 static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item)
 {
     GList *btns = wl->buttons;
+    char *mcid = menu_cache_id (wl, item->app_id);
     while (btns)
     {
         WindowBtn *btn = (WindowBtn *) btns->data;
-        if (!g_strcmp0 (btn->app_id, item->app_id)) return btn;
+        if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (item->app_id, btn->app_id))
+        {
+            g_free (mcid);
+            return btn;
+        }
         btns = g_list_next (btns);
     }
+    g_free (mcid);
     return NULL;
 }
 
@@ -738,7 +749,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
     MenuCacheItem *mitem;
 
     // create the desktop file name from the app_id
-    str = g_strdup_printf ("%s.desktop", item->app_id);
+    str = g_strdup_printf ("%s.desktop", item->launch_id ? item->launch_id : item->app_id);
     info = (GAppInfo *) g_desktop_app_info_new (str);
     g_free (str);
 
@@ -929,7 +940,8 @@ static void remove_launcher (GtkWidget *widget, gpointer)
 static void popup_menu (GtkWidget *widget, gpointer userdata)
 {
     GtkWidget *menu, *item, *label;
-    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    WindowBtn *btn = (WindowBtn *) userdata;
+    WinlistPlugin *wl = btn->plugin;
     const char *id = gtk_widget_get_name (widget);
     int count = 0;
     WindowItem *app;
@@ -1001,16 +1013,16 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     if (min)
     {
         item = gtk_menu_item_new_with_label (count > 1 ? _("Hide All") : _("Hide"));
-        gtk_widget_set_name (item, id);
-        g_signal_connect (item, "activate", G_CALLBACK (minimise_app), userdata);
+        gtk_widget_set_name (item, btn->app_id);
+        g_signal_connect (item, "activate", G_CALLBACK (minimise_app), wl);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
 
     if (unmin)
     {
         item = gtk_menu_item_new_with_label (count > 1 ? _("Show All") : _("Show"));
-        gtk_widget_set_name (item, id);
-        g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), userdata);
+        gtk_widget_set_name (item, btn->app_id);
+        g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), wl);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
 
@@ -1019,16 +1031,16 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         if (max)
         {
             item = gtk_menu_item_new_with_label (_("Maximise"));
-            gtk_widget_set_name (item, id);
-            g_signal_connect (item, "activate", G_CALLBACK (maximise_app), userdata);
+            gtk_widget_set_name (item, btn->app_id);
+            g_signal_connect (item, "activate", G_CALLBACK (maximise_app), wl);
             gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
         }
 
         if (unmax)
         {
             item = gtk_menu_item_new_with_label (_("Unmaximise"));
-            gtk_widget_set_name (item, id);
-            g_signal_connect (item, "activate", G_CALLBACK (unmaximise_app), userdata);
+            gtk_widget_set_name (item, btn->app_id);
+            g_signal_connect (item, "activate", G_CALLBACK (unmaximise_app), wl);
             gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
         }
     }
@@ -1039,25 +1051,32 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
         item = gtk_menu_item_new_with_label (count > 1 ? _("Close All") : _("Close"));
-        gtk_widget_set_name (item, id);
-        g_signal_connect (item, "activate", G_CALLBACK (close_app), userdata);
+        gtk_widget_set_name (item, btn->app_id);
+        g_signal_connect (item, "activate", G_CALLBACK (close_app), wl);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+
     }
-    else
+    else if (btn->launch_id)
     {
         item = gtk_menu_item_new_with_label (_("Remove from Launcher"));
-        gtk_widget_set_name (item, id);
+        gtk_widget_set_name (item, btn->launch_id);
         g_signal_connect (item, "activate", G_CALLBACK (remove_launcher), NULL);
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+
+        item = gtk_separator_menu_item_new ();
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
 
-    item = gtk_separator_menu_item_new ();
-    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    if (btn->launch_id)
+    {
+        item = gtk_separator_menu_item_new ();
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-    item = gtk_menu_item_new_with_label (_("Launch"));
-    gtk_widget_set_name (item, id);
-    g_signal_connect (item, "activate", G_CALLBACK (launch_id), item);
-    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+        item = gtk_menu_item_new_with_label (_("Launch"));
+        gtk_widget_set_name (item, btn->launch_id);
+        g_signal_connect (item, "activate", G_CALLBACK (launch_id), item);
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    }
 
     gtk_widget_show_all (menu);
     wrap_show_menu (widget, menu);
@@ -1129,6 +1148,8 @@ static void update_icons (WinlistPlugin *wl)
             update_item_width (wl, btn);
             gtk_widget_destroy (btn->icon);
             set_icon_and_title (wl, btn);
+            btn->app_id = g_strdup (item->app_id);
+            gtk_widget_set_name (btn->btn, item->app_id);
         }
         else
         {
@@ -1222,7 +1243,7 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
                     else launch_id (wid);
                     return FALSE;
 
-        case 3:     popup_menu (wid, userdata);
+        case 3:     popup_menu (wid, btn);
                     return TRUE;
     }
 
@@ -1237,7 +1258,7 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
 
     if (pressed == PRESS_LONG)
     {
-        popup_menu (btn->btn, btn->plugin);
+        popup_menu (btn->btn, btn);
     }
 }
 
@@ -1311,7 +1332,8 @@ static void add_launcher (WinlistPlugin *wl, char *id)
     WindowBtn *wbtn;
 
     wbtn = g_new0 (WindowBtn, 1);
-    wbtn->app_id = g_strdup (id);
+    wbtn->launch_id = g_strdup (id);
+    wbtn->app_id = NULL;
     wbtn->windows = 0;
     wbtn->plugin = wl;
     wbtn->launcher = TRUE;

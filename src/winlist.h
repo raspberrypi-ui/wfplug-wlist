@@ -79,6 +79,7 @@ typedef struct
 {
     WinlistPlugin *plugin;
     char *app_id;
+    char *launch_id;
     int windows;
     GtkWidget *btn;
     GtkWidget *icon;
