@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <menu-cache.h>
 
 #include "lxutils.h"
+#include "launcher.h"
 
 #include "winlist.h"
 
@@ -917,6 +918,11 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
     g_free (tip);
 }
 
+static void remove_launcher (GtkWidget *widget, gpointer)
+{
+    remove_from_launcher (gtk_widget_get_name (widget));
+}
+
 static void popup_menu (GtkWidget *widget, gpointer userdata)
 {
     GtkWidget *menu, *item, *label;
@@ -983,8 +989,11 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         list = list->next;
     }
 
-    item = gtk_separator_menu_item_new ();
-    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    if (count)
+    {
+        item = gtk_separator_menu_item_new ();
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    }
 
     if (min)
     {
@@ -1021,13 +1030,23 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         }
     }
 
-    item = gtk_separator_menu_item_new ();
-    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    if (count)
+    {
+        item = gtk_separator_menu_item_new ();
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-    item = gtk_menu_item_new_with_label (count > 1 ? _("Close All") : _("Close"));
-    gtk_widget_set_name (item, id);
-    g_signal_connect (item, "activate", G_CALLBACK (close_app), userdata);
-    gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+        item = gtk_menu_item_new_with_label (count > 1 ? _("Close All") : _("Close"));
+        gtk_widget_set_name (item, id);
+        g_signal_connect (item, "activate", G_CALLBACK (close_app), userdata);
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    }
+    else
+    {
+        item = gtk_menu_item_new_with_label (_("Remove from Launcher"));
+        gtk_widget_set_name (item, id);
+        g_signal_connect (item, "activate", G_CALLBACK (remove_launcher), NULL);
+        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
+    }
 
     gtk_widget_show_all (menu);
     wrap_show_menu (widget, menu);
