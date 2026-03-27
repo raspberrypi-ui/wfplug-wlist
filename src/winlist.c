@@ -564,13 +564,11 @@ static void destroy_button (WindowBtn *item)
 {
     if (item->app_id) g_free (item->app_id);
     if (item->icon) gtk_widget_destroy (item->icon);
-    if (item->label) gtk_widget_destroy (item->label);
     if (item->btn) gtk_widget_destroy (item->btn);
     if (item->gesture) g_object_unref (item->gesture);
     if (item->dgesture) g_object_unref (item->dgesture);
     item->app_id = NULL;
     item->icon = NULL;
-    item->label = NULL;
     item->btn = NULL;
     item->gesture = NULL;
     item->dgesture = NULL;

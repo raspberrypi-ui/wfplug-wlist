@@ -81,7 +81,6 @@ typedef struct
     int windows;
     GtkWidget *btn;
     GtkWidget *icon;
-    GtkWidget *label;
     GtkGesture *gesture;
     GtkGesture *dgesture;
     gboolean launcher;
