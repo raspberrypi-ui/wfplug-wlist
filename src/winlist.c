@@ -1041,12 +1041,16 @@ static void update_icons (WinlistPlugin *wl)
     WindowBtn *btn;
     GList *list;
 
-    // delete the existing widgets
+    // delete the existing widgets and free data
     list = wl->buttons;
     while (list)
     {
         btn = (WindowBtn *) list->data;
+        gtk_widget_destroy (btn->icon);
         gtk_widget_destroy (btn->btn);
+        g_free (btn->app_id);
+        g_free (btn->launch_id);
+        g_free (btn->tooltip);
         list = list->next;
     }
 
@@ -1092,22 +1096,6 @@ static void update_icons (WinlistPlugin *wl)
 
         list = list->next;
     }
-#if 0
-    WindowBtn *item;
-    GList *list, *children;
-
-    list = wl->buttons;
-    while (list)
-    {
-        item = (WindowBtn *) list->data;
-        gtk_widget_set_size_request (item->btn, -1, -1);
-        else gtk_widget_set_size_request (item->btn, wl->item_width, -1);
-        children = gtk_container_get_children (GTK_CONTAINER (item->btn));
-        g_list_free_full (children, (GDestroyNotify) gtk_widget_destroy);
-        set_icon_and_title (wl, item);
-        list = g_list_next (list);
-    }
-#endif
 
     gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
     gtk_widget_queue_allocate (wl->plugin);
