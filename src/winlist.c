@@ -60,7 +60,7 @@ conf_table_t conf_table[4] = {
 /* Prototypes                                                                 */
 /*----------------------------------------------------------------------------*/
 
-static void activate_app (GtkWidget *, gpointer userdata);
+static gboolean activate_app (GtkWidget *, gpointer userdata);
 static void close_app (GtkWidget *, gpointer userdata);
 static void maximise_app (GtkWidget *, gpointer userdata);
 static void unmaximise_app (GtkWidget *, gpointer userdata);
@@ -398,24 +398,7 @@ static struct wl_registry_listener registry_listener =
 /* Window handle controls                                                     */
 /*----------------------------------------------------------------------------*/
 
-static void activate_app (GtkWidget *wid, gpointer userdata)
-{
-    GdkDisplay *gdk_display = gdk_display_get_default ();
-    GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
-    struct wl_seat *wseat  = gdk_wayland_seat_get_wl_seat (seat);
-
-    WinlistPlugin *wl = (WinlistPlugin *) userdata;
-    GList *list = g_list_last (wl->windows);
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
-            zwlr_foreign_toplevel_handle_v1_activate (item->handle, wseat);
-        list = list->prev;
-    }
-}
-
-static gboolean toggle_app (GtkWidget *wid, gpointer userdata)
+static gboolean activate_app (GtkWidget *wid, gpointer userdata)
 {
     GdkDisplay *gdk_display = gdk_display_get_default ();
     GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
@@ -1286,7 +1269,7 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
 
     switch (event->button)
     {
-        case 1:     if (!btn->windows || !toggle_app (wid, userdata)) launch_id (wid);
+        case 1:     if (!btn->windows || !activate_app (wid, userdata)) launch_id (wid);
                     return FALSE;
 
         case 3:     popup_menu (wid, btn);
