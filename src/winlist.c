@@ -85,7 +85,7 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
 static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_update (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
-static void launch_id (GtkWidget *widget);
+static void launch_id (WinlistPlugin *wl, GtkWidget *widget);
 static void add_launcher (WinlistPlugin *wl, char *id);
 static void load_launchers (WinlistPlugin *wl);
 
@@ -1157,7 +1157,7 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
 
     switch (event->button)
     {
-        case 1:     if (!btn->windows || !activate_app (wid, userdata)) launch_id (wid);
+        case 1:     if (!btn->windows || !activate_app (wid, userdata)) launch_id (wl, wid);
                     return FALSE;
 
         case 3:     popup_menu (wid, btn);
@@ -1264,13 +1264,20 @@ static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userda
     gtk_style_context_remove_class (sc, "drag");
 }
 
-static void launch_id (GtkWidget *widget)
+static void launch_id (WinlistPlugin *wl, GtkWidget *widget)
 {
-    char *str = g_strdup_printf ("%s.desktop", gtk_widget_get_name (widget));
-    GAppInfo *info = (GAppInfo *) g_desktop_app_info_new (str);
-    g_free (str);
+    char *lid, *str;
+    GAppInfo *info;
+
+    lid = menu_cache_id (wl, gtk_widget_get_name (widget));
+    str = g_strdup_printf ("%s.desktop", lid);
+    info = (GAppInfo *) g_desktop_app_info_new (str);
+
     g_app_info_launch (info, NULL, NULL, NULL);
+
     g_object_unref (info);
+    g_free (lid);
+    g_free (str);
 }
 
 static void add_launcher (WinlistPlugin *wl, char *id)
