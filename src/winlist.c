@@ -402,7 +402,7 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
     gboolean min = FALSE, act = FALSE;
     GList *list, *new, *prev;
     WindowItem *item;
-    int contig = -1;
+    int contig = -1;    // flag used to detect contiguity of windows - should be 1 if they are all together at the front
 
     list = g_list_last (wl->windows);
     while (list)
@@ -432,11 +432,15 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
         {
             zwlr_foreign_toplevel_handle_v1_activate (item->handle, wseat);
+
+            // when an item is activated, move it to the front of a new list...
             wl->windows = g_list_remove_link (wl->windows, list);
             new = g_list_concat (list, new);
         }
         list = prev;
     }
+
+    // ...and then concatenate the new list onto the remainder - keeps the list in stack order
     wl->windows = g_list_concat (new, wl->windows);
 
     return TRUE;
