@@ -68,7 +68,8 @@ static void activate_handle (GtkWidget *, gpointer userdata);
 static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item);
 static void create_button (WinlistPlugin *wl, WindowBtn *item);
 static void destroy_button (WindowBtn *item);
-static gboolean update_button_state (WindowBtn *item);
+static void update_button_state (WindowBtn *item);
+static gboolean update_all_buttons (WinlistPlugin *wl);
 static void free_list_item (gpointer data);
 static float score_match (const char *str1, const char *str2);
 static char *get_exe (const char *cmdline);
@@ -573,7 +574,7 @@ static void destroy_button (WindowBtn *item)
     item->dgesture = NULL;
 }
 
-static gboolean update_button_state (WindowBtn *btn)
+static void update_button_state (WindowBtn *btn)
 {
     gboolean active = FALSE;
     GList *list = btn->plugin->windows;
@@ -589,6 +590,16 @@ static gboolean update_button_state (WindowBtn *btn)
     gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (btn->btn), active);
     g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
     g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_release), btn->plugin);
+}
+
+static gboolean update_all_buttons (WinlistPlugin *wl)
+{
+    GList *btn = wl->buttons;
+    while (btn)
+    {
+        update_button_state ((WindowBtn *) btn->data);
+        btn = btn->next;
+    }
     return FALSE;
 }
 
@@ -1124,7 +1135,7 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
 
     if (wl->dragon)
     {
-        g_idle_add ((GSourceFunc) update_button_state, btn);
+        g_idle_add ((GSourceFunc) update_all_buttons, wl);
         return FALSE;
     }
 
