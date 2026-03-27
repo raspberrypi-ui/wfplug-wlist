@@ -400,8 +400,9 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
 
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     gboolean min = FALSE, act = FALSE;
-    GList *list;
+    GList *list, *new, *prev;
     WindowItem *item;
+    int contig = -1;
 
     list = g_list_last (wl->windows);
     while (list)
@@ -414,20 +415,29 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
             // if all windows are visible and one is active, minimise all
             if (item->state & STATE_MINIMISED) min = TRUE;  // at least one window minimised
             if (item->state & STATE_ACTIVATED) act = TRUE;  // one window is activated
+            if (contig == -1) contig = 1;
         }
+        else if (contig == 1) contig = 0;
         list = list->prev;
     }
 
-    if (!min && act) return FALSE;
+    if (!min && act && contig) return FALSE;
 
     list = g_list_last (wl->windows);
+    new = NULL;
     while (list)
     {
+        prev = list->prev;
         item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        {
             zwlr_foreign_toplevel_handle_v1_activate (item->handle, wseat);
-        list = list->prev;
+            wl->windows = g_list_remove_link (wl->windows, list);
+            new = g_list_concat (list, new);
+        }
+        list = prev;
     }
+    wl->windows = g_list_concat (new, wl->windows);
 
     return TRUE;
 }
