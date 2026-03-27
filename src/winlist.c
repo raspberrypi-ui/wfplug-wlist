@@ -74,7 +74,6 @@ static float score_match (const char *str1, const char *str2);
 static char *get_exe (const char *cmdline);
 static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
 static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item);
-static void update_item_width (WinlistPlugin *wl, WindowBtn *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
 static void update_icons (WinlistPlugin *wl);
@@ -208,7 +207,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     btn = find_btn (wl, item);
                     if (btn)
                     {
-                        update_item_width (wl, btn);
+                        //gtk_widget_set_size_request (btn->btn, -1, -1);
                         update_button_state (btn);
                         gtk_widget_destroy (btn->icon);
                         set_icon_and_title (wl, btn);
@@ -224,7 +223,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     {
                         // found a button already for this app_id - update with new title, state etc
                         btn->windows++;
-                        update_item_width (wl, btn);
+                        //gtk_widget_set_size_request (btn->btn, -1, -1);
                         gtk_widget_destroy (btn->icon);
                         set_icon_and_title (wl, btn);
                         btn->app_id = g_strdup (item->app_id);
@@ -827,15 +826,10 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
     gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
     cairo_surface_destroy (surf);
 
-    gtk_widget_set_size_request (item->btn, -1, -1);
+    //gtk_widget_set_size_request (item->btn, -1, -1);
     gtk_widget_show_all (item->btn);
 
     g_free (str);
-}
-
-static void update_item_width (WinlistPlugin *, WindowBtn *btn)
-{
-    gtk_widget_set_size_request (btn->btn, -1, -1);
 }
 
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
@@ -1075,7 +1069,7 @@ static void update_icons (WinlistPlugin *wl)
         {
             // found a button already for this app_id - update with new title, state etc
             btn->windows++;
-            update_item_width (wl, btn);
+            //gtk_widget_set_size_request (btn->btn, -1, -1);
             gtk_widget_destroy (btn->icon);
             set_icon_and_title (wl, btn);
             btn->app_id = g_strdup (item->app_id);
