@@ -296,10 +296,11 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                             char *mcid = menu_cache_id (wl, item2->app_id);
                             if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (item2->app_id, btn->app_id))
                             {
-                                if (btn->windows == 1) gtk_label_set_text (GTK_LABEL (btn->label), item2->title);
+                                if (btn->windows == 1 && !wl->icons_only) gtk_label_set_text (GTK_LABEL (btn->label), item2->title);
                                 gtk_widget_destroy (btn->icon);
                                 set_icon_and_title (wl, btn);
-                                gtk_widget_set_name (btn->btn, btn->launch_id);
+                                if (btn->launch_id) gtk_widget_set_name (btn->btn, btn->launch_id);
+                                else gtk_widget_set_name (btn->btn, btn->app_id);
                                 break;
                             }
                             g_free (mcid);
@@ -414,7 +415,7 @@ static void activate_app (GtkWidget *wid, gpointer userdata)
     }
 }
 
-static void toggle_app (GtkWidget *wid, gpointer userdata)
+static gboolean toggle_app (GtkWidget *wid, gpointer userdata)
 {
     GdkDisplay *gdk_display = gdk_display_get_default ();
     GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
@@ -440,17 +441,18 @@ static void toggle_app (GtkWidget *wid, gpointer userdata)
         list = list->prev;
     }
 
+    if (!min && act) return FALSE;
+
     list = g_list_last (wl->windows);
     while (list)
     {
         item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
-        {
-            if (min || !act) zwlr_foreign_toplevel_handle_v1_activate (item->handle, wseat);
-            else zwlr_foreign_toplevel_handle_v1_set_minimized (item->handle);
-        }
+            zwlr_foreign_toplevel_handle_v1_activate (item->handle, wseat);
         list = list->prev;
     }
+
+    return TRUE;
 }
 
 static void close_app (GtkWidget *wid, gpointer userdata)
@@ -933,6 +935,12 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
     char *tip = NULL, *tmp, *esc;
     GList *list = wl->windows;
 
+    if (btn->windows == 0)
+    {
+        gtk_widget_set_tooltip_text (btn->btn, btn->tooltip);
+        return;
+    }
+
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
@@ -1278,8 +1286,7 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
 
     switch (event->button)
     {
-        case 1:     if (btn->windows) toggle_app (wid, userdata);
-                    else launch_id (wid);
+        case 1:     if (!btn->windows || !toggle_app (wid, userdata)) launch_id (wid);
                     return FALSE;
 
         case 3:     popup_menu (wid, btn);
@@ -1369,6 +1376,8 @@ static void launch_id (GtkWidget *widget)
 static void add_launcher (WinlistPlugin *wl, char *id)
 {
     WindowBtn *wbtn;
+    char *str;
+    GAppInfo *info;
 
     wbtn = g_new0 (WindowBtn, 1);
     wbtn->launch_id = g_strdup (id);
@@ -1378,6 +1387,14 @@ static void add_launcher (WinlistPlugin *wl, char *id)
     wbtn->launcher = TRUE;
     create_button (wl, wbtn);
     gtk_widget_set_name (wbtn->btn, id);
+
+    str = g_strdup_printf ("%s.desktop", id);
+    info = (GAppInfo *) g_desktop_app_info_new (str);
+    g_free (str);
+    wbtn->tooltip = g_strdup (g_app_info_get_name (info));
+    g_object_unref (info);
+
+    gtk_widget_set_tooltip_text (wbtn->btn, wbtn->tooltip);
     wl->buttons = g_list_prepend (wl->buttons, wbtn);
 }
 
