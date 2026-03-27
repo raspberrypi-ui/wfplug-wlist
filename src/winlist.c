@@ -50,8 +50,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*----------------------------------------------------------------------------*/
 
 conf_table_t conf_table[4] = {
-    {CONF_TYPE_INT,     "max_width",    N_("Maximum width of task button"), NULL},
-    {CONF_TYPE_BOOL,    "icons_only",   N_("Show only icons"),              NULL},
     {CONF_TYPE_INT,     "spacing",      N_("Item spacing"),                 NULL},
     {CONF_TYPE_NONE,    NULL,           NULL,                               NULL}
 };
@@ -79,9 +77,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item);
 static void update_item_width (WinlistPlugin *wl, WindowBtn *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
-static void update_widths (WinlistPlugin *wl, int width);
 static void update_icons (WinlistPlugin *wl);
-static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer userdata);
 static gboolean idle_resize (gpointer userdata);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
@@ -296,7 +292,6 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                             char *mcid = menu_cache_id (wl, item2->app_id);
                             if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (item2->app_id, btn->app_id))
                             {
-                                if (btn->windows == 1 && !wl->icons_only) gtk_label_set_text (GTK_LABEL (btn->label), item2->title);
                                 gtk_widget_destroy (btn->icon);
                                 set_icon_and_title (wl, btn);
                                 if (btn->launch_id) gtk_widget_set_name (btn->btn, btn->launch_id);
@@ -324,7 +319,6 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         btn = (WindowBtn *) btns->data;
         update_button_state (btn);
         set_tooltip (wl, btn);
-        if (!wl->icons_only && btn->btn) gtk_widget_set_size_request (btn->btn, wl->max_width, -1);
         btns = g_list_next (btns);
     }
 
@@ -766,7 +760,6 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
 
 static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
 {
-    GtkWidget *box;
     char *str, *id;
     GAppInfo *info;
     GIcon *ic;
@@ -801,20 +794,18 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
         else str = NULL;
     }
 
-    if (wl->icons_only)
+    int fsize, dim, radius;
+    char *buf;
+
+    item->icon = gtk_image_new ();
+    gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
+
+    GdkPixbuf *pb = load_taskbar_pixbuf (item->icon, str);
+    cairo_surface_t *surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
+    cairo_t *cr = cairo_create (surf);
+
+    if (item->windows)
     {
-        int fsize, dim, radius;
-        char *buf;
-
-        item->icon = gtk_image_new ();
-        gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
-
-        GdkPixbuf *pb = load_taskbar_pixbuf (item->icon, str);
-        cairo_surface_t *surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
-        cairo_t *cr = cairo_create (surf);
-
-        if (item->windows)
-        {
         dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
         radius = dim / 6;
         if (dim == 48) fsize = 10;
@@ -833,83 +824,20 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
         cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
         cairo_show_text (cr, buf);
         g_free (buf);
-        }
-
-        gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
-        cairo_surface_destroy (surf);
-
-        gtk_widget_set_size_request (item->btn, -1, -1);
     }
-    else
-    {
-        box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 5);
-        gtk_container_add (GTK_CONTAINER (item->btn), box);
 
-        item->icon = gtk_image_new ();
-        gtk_container_add (GTK_CONTAINER (box), item->icon);
-        wrap_set_taskbar_icon (wl, item->icon, str);
+    gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
+    cairo_surface_destroy (surf);
 
-        item->label = gtk_label_new ("");
-        gtk_label_set_xalign (GTK_LABEL (item->label), 0.0);
-        gtk_container_add (GTK_CONTAINER (box), item->label);
-
-        gtk_widget_show_all (box);
-
-        update_item_width (wl, item);
-    }
+    gtk_widget_set_size_request (item->btn, -1, -1);
     gtk_widget_show_all (item->btn);
 
     g_free (str);
 }
 
-static void update_item_width (WinlistPlugin *wl, WindowBtn *btn)
+static void update_item_width (WinlistPlugin *, WindowBtn *btn)
 {
-    char *str, *title;
-    int pref, min, tlen;
-    GList *list;
-
-    if (wl->icons_only)
-    {
-        gtk_widget_set_size_request (btn->btn, -1, -1);
-        return;
-    }
-
-    gtk_widget_set_size_request (btn->btn, wl->item_width, -1);
-
-    if (btn->windows > 1) title = _("<Multiple windows>");
-    else
-    {
-        list = wl->windows;
-        while (list)
-        {
-            WindowItem *item = (WindowItem *) list->data;
-            if (!item->parent && !g_strcmp0 (item->app_id, btn->app_id))
-            {
-                 title = item->title;
-                 break;
-            }
-            list = g_list_next (list);
-        }
-    }
-
-    if (title)
-    {
-        str = g_strdup (title);
-        for (tlen = strlen (str); tlen >= 0; tlen--)
-        {
-            if (tlen < (int) strlen (title))
-            {
-                if (tlen > 2) str[tlen - 3] = '.';
-                if (tlen > 1) str[tlen - 2] = '.';
-                if (tlen > 0) str[tlen - 1] = '.';
-            }
-            str[tlen] = 0;
-            gtk_label_set_text (GTK_LABEL (btn->label), str);
-            gtk_widget_get_preferred_width (btn->btn, &min, &pref);
-            if (pref <= wl->item_width) break;
-        }
-        g_free (str);
-    }
+    gtk_widget_set_size_request (btn->btn, -1, -1);
 }
 
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
@@ -1116,32 +1044,6 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 /* Layout control                                                             */
 /*----------------------------------------------------------------------------*/
 
-static void update_widths (WinlistPlugin *wl, int width)
-{
-    WindowBtn *item;
-    GList *list;
-    int target, count, oldwidth;
-
-    count = g_list_length (wl->buttons);
-
-    oldwidth = wl->item_width;
-    target = width;
-    target -= wl->spacing * (count - 1);
-    target /= count;
-    if (target >= wl->max_width) wl->item_width = wl->max_width;
-    else wl->item_width = target;
-
-    list = wl->buttons;
-    while (list)
-    {
-        item = (WindowBtn *) list->data;
-        update_item_width (wl, item);
-        list = g_list_next (list);
-    }
-
-    if (oldwidth != wl->item_width) g_idle_add (idle_resize, wl);
-}
-
 static void update_icons (WinlistPlugin *wl)
 {
     WindowBtn *btn;
@@ -1206,25 +1108,17 @@ static void update_icons (WinlistPlugin *wl)
     while (list)
     {
         item = (WindowBtn *) list->data;
-        wl->item_width = wl->max_width;
-        if (wl->icons_only) gtk_widget_set_size_request (item->btn, -1, -1);
+        gtk_widget_set_size_request (item->btn, -1, -1);
         else gtk_widget_set_size_request (item->btn, wl->item_width, -1);
         children = gtk_container_get_children (GTK_CONTAINER (item->btn));
         g_list_free_full (children, (GDestroyNotify) gtk_widget_destroy);
         set_icon_and_title (wl, item);
         list = g_list_next (list);
     }
+#endif
 
     gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
     gtk_widget_queue_allocate (wl->plugin);
-#endif
-}
-
-static void update_size (GtkWidget *, GtkAllocation *alloc, gpointer userdata)
-{
-    WinlistPlugin *wl = (WinlistPlugin *) userdata;
-    if (wl->dragon) return;
-    if (alloc->width > 1) update_widths (wl, alloc->width);
 }
 
 static gboolean idle_resize (gpointer userdata)
@@ -1312,7 +1206,7 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble, gpointer u
     sc = gtk_widget_get_style_context (wl->dragbtn);
     gtk_style_context_add_class (sc, "drag");
 
-    width = wl->icons_only ? get_icon_size (wl->plugin) : wl->item_width;
+    width = get_icon_size (wl->plugin);
 
     moveby = 0;
     if (wl->drag_start + x < -DRAG_THRESH) moveby = -1;
@@ -1418,12 +1312,10 @@ void wlist_init (WinlistPlugin *wl)
     bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 
     /* Set up variables */
-    wl->item_width = wl->max_width;
     wl->box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, wl->spacing);
     gtk_box_set_homogeneous (GTK_BOX (wl->box), TRUE);
     gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
     gtk_container_add (GTK_CONTAINER (wl->plugin), wl->box);
-    g_signal_connect (wl->plugin, "size-allocate", G_CALLBACK (update_size), wl);
     wl->drag = gdk_cursor_new_for_display (gdk_display_get_default (), GDK_HAND1);
 
     wl->dragon = FALSE;

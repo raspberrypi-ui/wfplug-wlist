@@ -50,9 +50,6 @@ typedef struct
     char *launchers;                /* List of launchers */
 
     int spacing;
-    int max_width;
-    int item_width;
-    gboolean icons_only;
 
     GtkWidget *dragbtn;
     float drag_start;

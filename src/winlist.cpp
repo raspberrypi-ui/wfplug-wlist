@@ -52,8 +52,6 @@ bool WayfireWinlist::set_icon (void)
 void WayfireWinlist::read_settings (void)
 {
     wl->spacing = spacing;
-    wl->max_width = max_width;
-    wl->icons_only = icons_only;
     wl->launchers = g_strdup (((std::string) launchers).c_str());
 }
 
@@ -84,8 +82,6 @@ void WayfireWinlist::init (Gtk::HBox *container)
 
     /* Setup callbacks */
     spacing.set_callback (sigc::mem_fun (*this, &WayfireWinlist::settings_changed_cb));
-    max_width.set_callback (sigc::mem_fun (*this, &WayfireWinlist::settings_changed_cb));
-    icons_only.set_callback (sigc::mem_fun (*this, &WayfireWinlist::settings_changed_cb));
     launchers.set_callback (sigc::mem_fun (*this, &WayfireWinlist::settings_changed_cb));
 }
 
