@@ -1232,8 +1232,37 @@ static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userda
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GtkStyleContext *sc;
+    GList *children, *index, *btns;
+    char *launchers = NULL, *tmp;
+    GtkWidget *btn;
+    WindowBtn *b;
 
     if (!wl->dragon) return;
+
+    children = gtk_container_get_children (GTK_CONTAINER (wl->box));
+    index = children;
+    while (index)
+    {
+        btn = GTK_WIDGET (index->data);
+        btns = wl->buttons;
+        while (btns)
+        {
+            b = (WindowBtn *) btns->data;
+            if (b->btn == btn && b->launch_id)
+            {
+                tmp = g_strdup_printf ("%s%s ", launchers ? launchers : "", b->launch_id);
+                g_free (launchers);
+                launchers = tmp;
+                break;
+            }
+            btns = btns->next;
+        }
+        index = index->next;
+    }
+    g_list_free (children);
+
+    replace_launchers (launchers);
+    g_free (launchers);
 
     wl->dragon = FALSE;
     gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), NULL);
