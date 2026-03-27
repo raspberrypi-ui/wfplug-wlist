@@ -1017,17 +1017,6 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
 
-    if (btn->launch_id)
-    {
-        item = gtk_separator_menu_item_new ();
-        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
-
-        item = gtk_menu_item_new_with_label (count ? _("New Window") : _("Launch"));
-        gtk_widget_set_name (item, btn->launch_id);
-        g_signal_connect (item, "activate", G_CALLBACK (launch_id), item);
-        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
-    }
-
     gtk_widget_show_all (menu);
     wrap_show_menu (widget, menu);
 }
