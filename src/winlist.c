@@ -78,7 +78,7 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
 static void update_icons (WinlistPlugin *wl);
-static gboolean idle_resize (gpointer userdata);
+//static gboolean idle_resize (gpointer userdata);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpointer userdata);
@@ -208,7 +208,6 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     btn = find_btn (wl, item);
                     if (btn)
                     {
-                        //gtk_widget_set_size_request (btn->btn, -1, -1);
                         update_button_state (btn);
                         gtk_widget_destroy (btn->icon);
                         set_icon_and_title (wl, btn);
@@ -224,7 +223,6 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     {
                         // found a button already for this app_id - update with new title, state etc
                         btn->windows++;
-                        //gtk_widget_set_size_request (btn->btn, -1, -1);
                         gtk_widget_destroy (btn->icon);
                         set_icon_and_title (wl, btn);
                         btn->app_id = g_strdup (item->app_id);
@@ -311,18 +309,6 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         }
         list = g_list_next (list);
     }
-
-    // force resize so buttons grow now there is more free space
-    btns = wl->buttons;
-    while (btns)
-    {
-        btn = (WindowBtn *) btns->data;
-        update_button_state (btn);
-        set_tooltip (wl, btn);
-        btns = g_list_next (btns);
-    }
-
-    g_idle_add (idle_resize, wl);
 }
 
 static void handle_toplevel_output_enter (void *, HANDLE_PTR, struct wl_output *)
@@ -570,8 +556,6 @@ static void create_button (WinlistPlugin *wl, WindowBtn *item)
     gtk_container_add (GTK_CONTAINER (wl->box), item->btn);
     set_icon_and_title (wl, item);
     gtk_widget_show_all (wl->plugin);
-
-    g_idle_add (idle_resize, wl);
 }
 
 static void destroy_button (WindowBtn *item)
@@ -851,7 +835,6 @@ static void set_icon_and_title (WinlistPlugin *wl, WindowBtn *item)
     gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
     cairo_surface_destroy (surf);
 
-    //gtk_widget_set_size_request (item->btn, -1, -1);
     gtk_widget_show_all (item->btn);
 
     g_free (str);
@@ -1087,7 +1070,6 @@ static void update_icons (WinlistPlugin *wl)
         {
             // found a button already for this app_id - update with new title, state etc
             btn->windows++;
-            //gtk_widget_set_size_request (btn->btn, -1, -1);
             gtk_widget_destroy (btn->icon);
             set_icon_and_title (wl, btn);
             btn->app_id = g_strdup (item->app_id);
@@ -1113,13 +1095,6 @@ static void update_icons (WinlistPlugin *wl)
 
     gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
     gtk_widget_queue_allocate (wl->plugin);
-}
-
-static gboolean idle_resize (gpointer userdata)
-{
-    WinlistPlugin *wl = (WinlistPlugin *) userdata;
-    gtk_widget_queue_resize (wl->plugin);
-    return FALSE;
 }
 
 /*----------------------------------------------------------------------------*/
