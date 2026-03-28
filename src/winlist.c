@@ -205,7 +205,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
             {
                 if (item->plugin)
                 {
-                    // button already exists - update the title
+                    // toplevel already exists - update the icon???
                     btn = find_btn (wl, item);
                     if (btn)
                     {
