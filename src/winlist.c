@@ -77,6 +77,7 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
 static void set_icon (WinlistPlugin *wl, WindowBtn *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
+static void create_or_update_button (WinlistPlugin *wl, WindowItem *item);
 static void update_icons (WinlistPlugin *wl);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
@@ -216,29 +217,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                 {
                     // new toplevel - look to see if its id is already associated with a button...
                     item->plugin = wl;
-                    btn = find_btn (wl, item);
-                    if (btn)
-                    {
-                        // found a button already for this app_id - update with new title, state etc
-                        btn->windows++;
-                        set_icon (wl, btn);
-                        btn->app_id = g_strdup (item->app_id);
-                        gtk_widget_set_name (btn->btn, item->app_id);
-                    }
-                    else
-                    {
-                        // ...and if not, create one
-                        btn = g_new0 (WindowBtn, 1);
-                        btn->app_id = g_strdup (item->app_id);
-                        btn->windows = 1;
-                        btn->plugin = wl;
-                        btn->launcher = FALSE;
-                        create_button (wl, btn);
-                        gtk_widget_set_name (btn->btn, item->app_id);
-                        wl->buttons = g_list_prepend (wl->buttons, btn);
-                    }
-                    update_button_state (btn);
-                    set_tooltip (wl, btn);
+                    create_or_update_button (wl, item);
                 }
             }
             if (item->state & STATE_ACTIVATED && list != wl->windows)
@@ -1033,6 +1012,34 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 /* Layout control                                                             */
 /*----------------------------------------------------------------------------*/
 
+static void create_or_update_button (WinlistPlugin *wl, WindowItem *item)
+{
+    WindowBtn *btn;
+    btn = find_btn (wl, item);
+    if (btn)
+    {
+        // found a button already for this app_id - update with new title, state etc
+        btn->windows++;
+        set_icon (wl, btn);
+        btn->app_id = g_strdup (item->app_id);
+        gtk_widget_set_name (btn->btn, item->app_id);
+    }
+    else
+    {
+        // ...and if not, create one
+        btn = g_new0 (WindowBtn, 1);
+        btn->app_id = g_strdup (item->app_id);
+        btn->windows = 1;
+        btn->plugin = wl;
+        btn->launcher = FALSE;
+        create_button (wl, btn);
+        gtk_widget_set_name (btn->btn, item->app_id);
+        wl->buttons = g_list_prepend (wl->buttons, btn);
+    }
+    update_button_state (btn);
+    set_tooltip (wl, btn);
+}
+
 static void update_icons (WinlistPlugin *wl)
 {
     WindowBtn *btn;
@@ -1063,32 +1070,7 @@ static void update_icons (WinlistPlugin *wl)
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-
-        // new toplevel - look to see if its id is already associated with a button...
-        btn = find_btn (wl, item);
-        if (btn)
-        {
-            // found a button already for this app_id - update with new title, state etc
-            btn->windows++;
-            set_icon (wl, btn);
-            btn->app_id = g_strdup (item->app_id);
-            gtk_widget_set_name (btn->btn, item->app_id);
-        }
-        else
-        {
-            // ...and if not, create one
-            btn = g_new0 (WindowBtn, 1);
-            btn->app_id = g_strdup (item->app_id);
-            btn->windows = 1;
-            btn->plugin = wl;
-            btn->launcher = FALSE;
-            create_button (wl, btn);
-            gtk_widget_set_name (btn->btn, item->app_id);
-            wl->buttons = g_list_prepend (wl->buttons, btn);
-        }
-        update_button_state (btn);
-        set_tooltip (wl, btn);
-
+        create_or_update_button (wl, item);
         list = list->next;
     }
 
