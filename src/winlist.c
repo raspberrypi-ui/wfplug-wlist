@@ -78,7 +78,6 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
 static void update_icons (WinlistPlugin *wl);
-//static gboolean idle_resize (gpointer userdata);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpointer userdata);
@@ -209,7 +208,6 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     if (btn)
                     {
                         update_button_state (btn);
-                        gtk_widget_destroy (btn->icon);
                         set_icon (wl, btn);
                         set_tooltip (wl, btn);
                     }
@@ -223,7 +221,6 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     {
                         // found a button already for this app_id - update with new title, state etc
                         btn->windows++;
-                        gtk_widget_destroy (btn->icon);
                         set_icon (wl, btn);
                         btn->app_id = g_strdup (item->app_id);
                         gtk_widget_set_name (btn->btn, item->app_id);
@@ -290,7 +287,6 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                             char *mcid = menu_cache_id (wl, item2->app_id);
                             if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (item2->app_id, btn->app_id))
                             {
-                                gtk_widget_destroy (btn->icon);
                                 set_icon (wl, btn);
                                 if (btn->launch_id) gtk_widget_set_name (btn->btn, btn->launch_id);
                                 else gtk_widget_set_name (btn->btn, btn->app_id);
@@ -554,6 +550,7 @@ static void create_button (WinlistPlugin *wl, WindowBtn *item)
     g_signal_connect (item->dgesture, "drag-end", G_CALLBACK (handle_drag_end), wl);
 
     gtk_container_add (GTK_CONTAINER (wl->box), item->btn);
+    item->icon = NULL;
     set_icon (wl, item);
     gtk_widget_show_all (wl->plugin);
 }
@@ -770,6 +767,9 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
     GAppInfo *info;
     GIcon *ic;
     MenuCacheItem *mitem;
+
+    // delete any existing icon
+    if (item->icon) gtk_widget_destroy (item->icon);
 
     // create the desktop file name from the app_id
     str = g_strdup_printf ("%s.desktop", item->launch_id ? item->launch_id : item->app_id);
@@ -1070,7 +1070,6 @@ static void update_icons (WinlistPlugin *wl)
         {
             // found a button already for this app_id - update with new title, state etc
             btn->windows++;
-            gtk_widget_destroy (btn->icon);
             set_icon (wl, btn);
             btn->app_id = g_strdup (item->app_id);
             gtk_widget_set_name (btn->btn, item->app_id);
