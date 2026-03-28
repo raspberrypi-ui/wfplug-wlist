@@ -87,7 +87,7 @@ typedef struct
 } WindowBtn;
 
 
-extern conf_table_t conf_table[4];
+extern conf_table_t conf_table[2];
 
 /*----------------------------------------------------------------------------*/
 /* Prototypes                                                                 */

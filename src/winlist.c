@@ -49,7 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* Global data                                                                */
 /*----------------------------------------------------------------------------*/
 
-conf_table_t conf_table[4] = {
+conf_table_t conf_table[2] = {
     {CONF_TYPE_INT,     "spacing",      N_("Item spacing"),                 NULL},
     {CONF_TYPE_NONE,    NULL,           NULL,                               NULL}
 };
@@ -77,6 +77,10 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
 static void set_icon (WinlistPlugin *wl, WindowBtn *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
+static void launch_id (WinlistPlugin *wl, GtkWidget *widget);
+static void add_launcher (WinlistPlugin *wl, char *id);
+static void load_launchers (WinlistPlugin *wl);
+static void remove_launcher (GtkWidget *widget, gpointer);
 static void create_or_update_button (WinlistPlugin *wl, WindowItem *item);
 static void update_icons (WinlistPlugin *wl);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
@@ -85,9 +89,6 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
 static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_update (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
-static void launch_id (WinlistPlugin *wl, GtkWidget *widget);
-static void add_launcher (WinlistPlugin *wl, char *id);
-static void load_launchers (WinlistPlugin *wl);
 
 /*----------------------------------------------------------------------------*/
 /* Wayland protocol interface                                                 */
@@ -869,11 +870,6 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
     g_free (tip);
 }
 
-static void remove_launcher (GtkWidget *widget, gpointer)
-{
-    remove_from_launcher (gtk_widget_get_name (widget));
-}
-
 static void popup_menu (GtkWidget *widget, gpointer userdata)
 {
     GtkWidget *menu, *item, *label;
@@ -1006,6 +1002,70 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 
     gtk_widget_show_all (menu);
     wrap_show_menu (widget, menu);
+}
+
+/*----------------------------------------------------------------------------*/
+/* Launchers                                                                  */
+/*----------------------------------------------------------------------------*/
+
+static void launch_id (WinlistPlugin *wl, GtkWidget *widget)
+{
+    char *lid, *str;
+    GAppInfo *info;
+
+    lid = menu_cache_id (wl, gtk_widget_get_name (widget));
+    str = g_strdup_printf ("%s.desktop", lid);
+    info = (GAppInfo *) g_desktop_app_info_new (str);
+
+    g_app_info_launch (info, NULL, NULL, NULL);
+
+    g_object_unref (info);
+    g_free (lid);
+    g_free (str);
+}
+
+static void add_launcher (WinlistPlugin *wl, char *id)
+{
+    WindowBtn *wbtn;
+    char *str;
+    GAppInfo *info;
+
+    wbtn = g_new0 (WindowBtn, 1);
+    wbtn->launch_id = g_strdup (id);
+    wbtn->app_id = NULL;
+    wbtn->windows = 0;
+    wbtn->plugin = wl;
+    wbtn->launcher = TRUE;
+    create_button (wl, wbtn);
+    gtk_widget_set_name (wbtn->btn, id);
+
+    str = g_strdup_printf ("%s.desktop", id);
+    info = (GAppInfo *) g_desktop_app_info_new (str);
+    g_free (str);
+    wbtn->tooltip = g_strdup (g_app_info_get_name (info));
+    g_object_unref (info);
+
+    gtk_widget_set_tooltip_text (wbtn->btn, wbtn->tooltip);
+    wl->buttons = g_list_prepend (wl->buttons, wbtn);
+}
+
+static void load_launchers (WinlistPlugin *wl)
+{
+    char *lstr, *launcher;
+
+    lstr = g_strdup (wl->launchers);
+    launcher = strtok (lstr, " ");
+    while (launcher)
+    {
+        add_launcher (wl, launcher);
+        launcher = strtok (NULL, " ");
+    }
+    g_free (lstr);
+}
+
+static void remove_launcher (GtkWidget *widget, gpointer)
+{
+    remove_from_launcher (gtk_widget_get_name (widget));
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1218,61 +1278,6 @@ static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userda
     gdk_window_set_cursor (gtk_widget_get_window (wl->plugin), NULL);
     sc = gtk_widget_get_style_context (wl->dragbtn);
     gtk_style_context_remove_class (sc, "drag");
-}
-
-static void launch_id (WinlistPlugin *wl, GtkWidget *widget)
-{
-    char *lid, *str;
-    GAppInfo *info;
-
-    lid = menu_cache_id (wl, gtk_widget_get_name (widget));
-    str = g_strdup_printf ("%s.desktop", lid);
-    info = (GAppInfo *) g_desktop_app_info_new (str);
-
-    g_app_info_launch (info, NULL, NULL, NULL);
-
-    g_object_unref (info);
-    g_free (lid);
-    g_free (str);
-}
-
-static void add_launcher (WinlistPlugin *wl, char *id)
-{
-    WindowBtn *wbtn;
-    char *str;
-    GAppInfo *info;
-
-    wbtn = g_new0 (WindowBtn, 1);
-    wbtn->launch_id = g_strdup (id);
-    wbtn->app_id = NULL;
-    wbtn->windows = 0;
-    wbtn->plugin = wl;
-    wbtn->launcher = TRUE;
-    create_button (wl, wbtn);
-    gtk_widget_set_name (wbtn->btn, id);
-
-    str = g_strdup_printf ("%s.desktop", id);
-    info = (GAppInfo *) g_desktop_app_info_new (str);
-    g_free (str);
-    wbtn->tooltip = g_strdup (g_app_info_get_name (info));
-    g_object_unref (info);
-
-    gtk_widget_set_tooltip_text (wbtn->btn, wbtn->tooltip);
-    wl->buttons = g_list_prepend (wl->buttons, wbtn);
-}
-
-static void load_launchers (WinlistPlugin *wl)
-{
-    char *lstr, *launcher;
-
-    lstr = g_strdup (wl->launchers);
-    launcher = strtok (lstr, " ");
-    while (launcher)
-    {
-        add_launcher (wl, launcher);
-        launcher = strtok (NULL, " ");
-    }
-    g_free (lstr);
 }
 
 /*----------------------------------------------------------------------------*/
