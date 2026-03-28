@@ -236,9 +236,9 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
 static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
-    WindowItem *item, *item2;
+    WindowItem *item;
     WindowBtn *btn;
-    GList *list, *btns;
+    GList *list;
 
     list = wl->windows;
     while (list)
@@ -254,32 +254,14 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                     btn->windows--;
                     if (!btn->windows && !btn->launcher)
                     {
+                        // not a launcher and no open windows - remove button
                         destroy_button (btn);
-                        btns = g_list_find (wl->buttons, btn);
-                        wl->buttons = g_list_delete_link (wl->buttons, btns);
+                        wl->buttons = g_list_delete_link (wl->buttons, g_list_find (wl->buttons, btn));
                     }
-                    else
-                    {
-                        btns = wl->windows;
-                        while (btns)
-                        {
-                            item2 = (WindowItem *) btns->data;
-                            char *mcid = menu_cache_id (wl, item2->app_id);
-                            if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (item2->app_id, btn->app_id))
-                            {
-                                set_icon (wl, btn);
-                                if (btn->launch_id) gtk_widget_set_name (btn->btn, btn->launch_id);
-                                else gtk_widget_set_name (btn->btn, btn->app_id);
-                                break;
-                            }
-                            g_free (mcid);
-                            btns = g_list_next (btns);
-                        }
-                    }
+                    else set_icon (wl, btn);
                 }
             }
-            if (item->title) g_free (item->title);
-            if (item->app_id) g_free (item->app_id);
+            free_list_item (item);
             wl->windows = g_list_delete_link (wl->windows, list);
             break;
         }
