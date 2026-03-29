@@ -1341,6 +1341,8 @@ void wlist_init (WinlistPlugin *wl)
     wl_display_roundtrip (display);
     wl_registry_destroy (registry);
 
+    load_launchers (wl);
+
     if (wl->manager) zwlr_foreign_toplevel_manager_v1_add_listener (wl->manager, &toplevel_manager_v1, wl);
 }
 
