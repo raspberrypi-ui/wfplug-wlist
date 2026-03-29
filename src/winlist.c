@@ -542,6 +542,7 @@ static gboolean update_button_states (WinlistPlugin *wl)
     GList *btns, *list;
     gboolean active;
     WindowBtn *btn;
+    WindowItem *item;
 
     btns = wl->buttons;
     while (btns)
@@ -551,7 +552,7 @@ static gboolean update_button_states (WinlistPlugin *wl)
         list = wl->windows;
         while (list)
         {
-            WindowItem *item = (WindowItem *) list->data;
+            item = (WindowItem *) list->data;
             if (!g_strcmp0 (gtk_widget_get_name (btn->btn), item->app_id) && item->state & STATE_ACTIVATED) active = TRUE;
             list = list->next;
         }
