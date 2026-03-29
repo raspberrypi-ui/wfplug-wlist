@@ -68,8 +68,7 @@ static void activate_handle (GtkWidget *, gpointer userdata);
 static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item);
 static void create_button (WinlistPlugin *wl, WindowBtn *item);
 static void destroy_button (WindowBtn *item);
-static void update_button_state (WindowBtn *item);
-static gboolean update_all_buttons (WinlistPlugin *wl);
+static gboolean update_button_states (WinlistPlugin *wl);
 static void free_list_item (gpointer data);
 static float score_match (const char *str1, const char *str2);
 static char *get_exe (const char *cmdline);
@@ -211,7 +210,6 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
                     btn = find_btn (wl, item);
                     if (btn)
                     {
-                        update_button_state (btn);
                         set_icon (wl, btn);
                         set_tooltip (wl, btn);
                     }
@@ -233,6 +231,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
         }
         list = g_list_next (list);
     }
+    update_button_states (wl);
 }
 
 static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
@@ -269,6 +268,7 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         }
         list = g_list_next (list);
     }
+    update_button_states (wl);
 }
 
 static void handle_toplevel_output_enter (void *, HANDLE_PTR, struct wl_output *)
@@ -537,31 +537,32 @@ static void destroy_button (WindowBtn *item)
     item->dgesture = NULL;
 }
 
-static void update_button_state (WindowBtn *btn)
+static gboolean update_button_states (WinlistPlugin *wl)
 {
-    gboolean active = FALSE;
-    GList *list = btn->plugin->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (btn->btn), item->app_id) && item->state & STATE_ACTIVATED) active = TRUE;
-        list = list->next;
-    }
+    GList *btns, *list;
+    gboolean active;
+    WindowBtn *btn;
 
-    g_signal_handlers_block_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
-    g_signal_handlers_block_by_func (btn->btn, G_CALLBACK (handle_button_release), btn->plugin);
-    gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (btn->btn), active);
-    g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
-    g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_release), btn->plugin);
-}
-
-static gboolean update_all_buttons (WinlistPlugin *wl)
-{
-    GList *btn = wl->buttons;
-    while (btn)
+    btns = wl->buttons;
+    while (btns)
     {
-        update_button_state ((WindowBtn *) btn->data);
-        btn = btn->next;
+        btn = (WindowBtn *) btns->data;
+        active = FALSE;
+        list = wl->windows;
+        while (list)
+        {
+            WindowItem *item = (WindowItem *) list->data;
+            if (!g_strcmp0 (gtk_widget_get_name (btn->btn), item->app_id) && item->state & STATE_ACTIVATED) active = TRUE;
+            list = list->next;
+        }
+
+        g_signal_handlers_block_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
+        g_signal_handlers_block_by_func (btn->btn, G_CALLBACK (handle_button_release), btn->plugin);
+        gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (btn->btn), active);
+        g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
+        g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_release), btn->plugin);
+
+        btns = btns->next;
     }
     return FALSE;
 }
@@ -1112,7 +1113,6 @@ static void create_or_update_button (WinlistPlugin *wl, WindowItem *item)
         gtk_widget_set_name (btn->btn, item->app_id);
         wl->buttons = g_list_prepend (wl->buttons, btn);
     }
-    update_button_state (btn);
     set_tooltip (wl, btn);
 }
 
@@ -1149,6 +1149,7 @@ static void update_icons (WinlistPlugin *wl)
         create_or_update_button (wl, item);
         list = list->next;
     }
+    update_button_states (wl);
 
     gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
     gtk_widget_queue_allocate (wl->plugin);
@@ -1181,7 +1182,7 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
 
     if (wl->dragon)
     {
-        g_idle_add ((GSourceFunc) update_all_buttons, wl);
+        g_idle_add ((GSourceFunc) update_button_states, wl);
         return FALSE;
     }
 
