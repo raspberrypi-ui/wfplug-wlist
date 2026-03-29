@@ -1327,6 +1327,7 @@ void wlist_init (WinlistPlugin *wl)
 
     wl->dragon = FALSE;
     wl->windows = NULL;
+    wl->buttons = NULL;
 
     gboolean need_prefix = (g_getenv ("XDG_MENU_PREFIX") == NULL);
     wl->menu_cache = menu_cache_lookup (need_prefix ? "lxde-applications.menu+hidden" : "applications.menu+hidden");
