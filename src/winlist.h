@@ -77,6 +77,7 @@ typedef struct
     WinlistPlugin *plugin;
     char *app_id;
     char *launch_id;
+    char *alt_launch_id;
     char *tooltip;
     int windows;
     GtkWidget *btn;

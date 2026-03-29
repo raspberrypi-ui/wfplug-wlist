@@ -78,6 +78,8 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
 static void launch_id (WinlistPlugin *wl, GtkWidget *widget);
+static char *get_string (char *cmd);
+static char *find_alternative (const char *launch_id);
 static void add_launcher (WinlistPlugin *wl, char *id);
 static void load_launchers (WinlistPlugin *wl);
 static void remove_launcher (GtkWidget *widget, gpointer);
@@ -486,7 +488,7 @@ static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item)
     while (btns)
     {
         WindowBtn *btn = (WindowBtn *) btns->data;
-        if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (item->app_id, btn->app_id))
+        if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (mcid, btn->alt_launch_id) ||!g_strcmp0 (item->app_id, btn->app_id))
         {
             g_free (mcid);
             return btn;
@@ -520,11 +522,15 @@ static void create_button (WinlistPlugin *wl, WindowBtn *item)
 static void destroy_button (WindowBtn *item)
 {
     if (item->app_id) g_free (item->app_id);
+    if (item->launch_id) g_free (item->launch_id);
+    if (item->alt_launch_id) g_free (item->alt_launch_id);
     if (item->icon) gtk_widget_destroy (item->icon);
     if (item->btn) gtk_widget_destroy (item->btn);
     if (item->gesture) g_object_unref (item->gesture);
     if (item->dgesture) g_object_unref (item->dgesture);
     item->app_id = NULL;
+    item->launch_id = NULL;
+    item->alt_launch_id = NULL;
     item->icon = NULL;
     item->btn = NULL;
     item->gesture = NULL;
@@ -977,9 +983,6 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         gtk_widget_set_name (item, btn->launch_id);
         g_signal_connect (item, "activate", G_CALLBACK (remove_launcher), NULL);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
-
-        item = gtk_separator_menu_item_new ();
-        gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
 
     gtk_widget_show_all (menu);
@@ -1006,6 +1009,34 @@ static void launch_id (WinlistPlugin *wl, GtkWidget *widget)
     g_free (str);
 }
 
+static char *get_string (char *cmd)
+{
+    char *line = NULL, *res = NULL;
+    size_t len = 0;
+    FILE *fp = popen (cmd, "r");
+
+    if (fp == NULL) return NULL;
+    if (getline (&line, &len, fp) > 0)
+    {
+        res = line;
+        while (*res)
+        {
+            if (g_ascii_isspace (*res)) *res = 0;
+            res++;
+        }
+        res = g_strdup (line);
+    }
+    pclose (fp);
+    g_free (line);
+    return res;
+}
+
+static char *find_alternative (const char *launch_id)
+{
+    char *cmd = g_strdup_printf ("update-alternatives --query %s 2> /dev/null| grep Value | cut -d ' ' -f 2 | rev | cut -d / -f 1 | rev", launch_id);
+    return get_string (cmd);
+}
+
 static void add_launcher (WinlistPlugin *wl, char *id)
 {
     WindowBtn *wbtn;
@@ -1014,6 +1045,7 @@ static void add_launcher (WinlistPlugin *wl, char *id)
 
     wbtn = g_new0 (WindowBtn, 1);
     wbtn->launch_id = g_strdup (id);
+    wbtn->alt_launch_id = find_alternative (id);
     wbtn->app_id = NULL;
     wbtn->windows = 0;
     wbtn->plugin = wl;
@@ -1071,6 +1103,8 @@ static void create_or_update_button (WinlistPlugin *wl, WindowItem *item)
         // ...and if not, create one
         btn = g_new0 (WindowBtn, 1);
         btn->app_id = g_strdup (item->app_id);
+        btn->launch_id = NULL;
+        btn->alt_launch_id = NULL;
         btn->windows = 1;
         btn->plugin = wl;
         btn->launcher = FALSE;
