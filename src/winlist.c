@@ -79,22 +79,21 @@ static void minimise_app (GtkWidget *, gpointer userdata);
 static void unminimise_app (GtkWidget *, gpointer userdata);
 static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item);
 static void create_button (WinlistPlugin *wl, WindowBtn *item);
-static void destroy_button (WindowBtn *item);
+static void create_or_update_button (WinlistPlugin *wl, WindowItem *item);
+static void set_icon (WinlistPlugin *wl, WindowBtn *item);
+static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
+static void destroy_button (gpointer data);
 static gboolean update_button_states (WinlistPlugin *wl);
-static void destroy_toplevel_entry (gpointer data);
 static float score_match (const char *str1, const char *str2);
 static char *get_exe (const char *cmdline);
 static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
-static void set_icon (WinlistPlugin *wl, WindowBtn *item);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
-static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
 static void launch_id (WinlistPlugin *wl, GtkWidget *widget);
 static char *get_string (char *cmd);
 static char *find_alternative (const char *launch_id);
 static void add_launcher (WinlistPlugin *wl, char *id);
 static void load_launchers (WinlistPlugin *wl);
 static void remove_launcher (GtkWidget *widget, gpointer);
-static void create_or_update_button (WinlistPlugin *wl, WindowItem *item);
 static void update_icons (WinlistPlugin *wl);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
@@ -102,6 +101,8 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
 static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_update (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
+static void close_handle (gpointer data, gpointer);
+static void destroy_toplevel_entry (gpointer data);
 
 /*----------------------------------------------------------------------------*/
 /* Wayland protocol interface                                                 */
@@ -529,8 +530,170 @@ static void create_button (WinlistPlugin *wl, WindowBtn *item)
     gtk_widget_show_all (wl->plugin);
 }
 
-static void destroy_button (WindowBtn *item)
+static void create_or_update_button (WinlistPlugin *wl, WindowItem *item)
 {
+    WindowBtn *btn;
+    btn = find_btn (wl, item);
+    if (btn)
+    {
+        // found a button already for this app_id - update with new title, state etc
+        btn->windows++;
+        set_icon (wl, btn);
+        btn->app_id = g_strdup (item->app_id);
+        gtk_widget_set_name (btn->btn, item->app_id);
+    }
+    else
+    {
+        // ...and if not, create one
+        btn = g_new0 (WindowBtn, 1);
+        btn->app_id = g_strdup (item->app_id);
+        btn->launch_id = NULL;
+        btn->alt_launch_id = NULL;
+        btn->windows = 1;
+        btn->plugin = wl;
+        btn->launcher = FALSE;
+        create_button (wl, btn);
+        gtk_widget_set_name (btn->btn, item->app_id);
+        wl->buttons = g_list_prepend (wl->buttons, btn);
+    }
+    set_tooltip (wl, btn);
+}
+
+static void set_icon (WinlistPlugin *wl, WindowBtn *item)
+{
+    char *str, *id, *buf;
+    GAppInfo *info;
+    GIcon *ic;
+    MenuCacheItem *mitem;
+    int fsize, dim, radius;
+    GdkPixbuf *pb;
+    cairo_surface_t *surf;
+    cairo_t *cr;
+
+    // delete any existing icon
+    if (item->icon) gtk_widget_destroy (item->icon);
+
+    // create the desktop file name from the app_id
+    str = g_strdup_printf ("%s.desktop", item->launch_id ? item->launch_id : item->app_id);
+    info = (GAppInfo *) g_desktop_app_info_new (str);
+    g_free (str);
+
+    if (info)
+    {
+        // the desktop file name is valid, so just get the icon from it
+        ic = g_app_info_get_icon (info);
+        str = g_icon_to_string (ic);
+        g_object_unref (info);
+    }
+    else
+    {
+        // the desktop file name isn't valid, so search the menu cache for something similar
+        id = menu_cache_id (wl, item->app_id);
+        str = g_strdup_printf ("%s.desktop", id);
+        g_free (id);
+        mitem = menu_cache_find_item_by_id (wl->menu_cache, str);
+        g_free (str);
+
+        if (mitem)
+        {
+            str = g_strdup (menu_cache_item_get_icon (mitem));
+            menu_cache_item_unref (mitem);
+        }
+        else str = NULL;
+    }
+
+    item->icon = gtk_image_new ();
+    gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
+
+    pb = load_taskbar_pixbuf (item->icon, str);
+    surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
+    cr = cairo_create (surf);
+
+    if (item->windows)
+    {
+        dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
+        radius = dim / 6;
+        if (dim == 48) fsize = 10;
+        if (dim == 32) fsize = 7;
+        if (dim == 24) fsize = 5;
+        if (dim == 16) fsize = 3;
+
+        cairo_set_source_rgb (cr, 1 ,1, 1);
+        cairo_arc (cr, dim - radius, dim - radius, radius, 0, 6.3);
+        cairo_fill (cr);
+
+        if (item->windows < 10) buf = g_strdup_printf ("%d", item->windows);
+        else buf = g_strdup ("*");
+        cairo_set_source_rgb (cr, 0, 0, 0);
+        cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_set_font_size (cr, fsize);
+        cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
+        cairo_show_text (cr, buf);
+        g_free (buf);
+    }
+
+    gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
+    cairo_surface_destroy (surf);
+
+    gtk_widget_show_all (item->btn);
+
+    g_free (str);
+}
+
+static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
+{
+    const char *open, *close;
+    char *tip = NULL, *tmp, *esc;
+    GList *list;
+
+    if (btn->windows == 0)
+    {
+        gtk_widget_set_tooltip_text (btn->btn, btn->tooltip);
+        return;
+    }
+
+    list = wl->windows;
+    while (list)
+    {
+        WindowItem *item = (WindowItem *) list->data;
+        if (!g_strcmp0 (item->app_id, btn->app_id))
+        {
+            if (item->state & STATE_MINIMISED && item->state & STATE_MAXIMISED)
+            {
+                open = "<b><i>";
+                close = "</i></b>";
+            }
+            else if (item->state & STATE_MINIMISED)
+            {
+                open = "<i>";
+                close = "</i>";
+            }
+            else if (item->state & STATE_MAXIMISED)
+            {
+                open = "<b>";
+                close = "</b>";
+            }
+            else
+            {
+                open = "";
+                close = "";
+            }
+            esc = g_markup_escape_text (item->title, -1);
+            tmp = g_strdup_printf ("%s%s%s%s%s", tip ? tip : "", tip ? "\n" : "", open, esc, close);
+            g_free (esc);
+            if (tip) g_free (tip);
+            tip = tmp;
+        }
+        list = g_list_next (list);
+    }
+
+    gtk_widget_set_tooltip_markup (btn->btn, tip);
+    g_free (tip);
+}
+
+static void destroy_button (gpointer data)
+{
+    WindowBtn *item = (WindowBtn *) data;
     if (item->app_id) g_free (item->app_id);
     if (item->launch_id) g_free (item->launch_id);
     if (item->alt_launch_id) g_free (item->alt_launch_id);
@@ -578,12 +741,9 @@ static gboolean update_button_states (WinlistPlugin *wl)
     return FALSE;
 }
 
-static void destroy_toplevel_entry (gpointer data)
-{
-    WindowItem *item = (WindowItem *) data;
-    if (item->title) g_free (item->title);
-    if (item->app_id) g_free (item->app_id);
-}
+/*----------------------------------------------------------------------------*/
+/* Menu cache search                                                          */
+/*----------------------------------------------------------------------------*/
 
 /* This is an attempt to score how similar two strings are by comparing how many letters
  * at the start of each are identical, and how many letters at the end are identical.
@@ -741,137 +901,9 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
     return best;
 }
 
-static void set_icon (WinlistPlugin *wl, WindowBtn *item)
-{
-    char *str, *id, *buf;
-    GAppInfo *info;
-    GIcon *ic;
-    MenuCacheItem *mitem;
-    int fsize, dim, radius;
-    GdkPixbuf *pb;
-    cairo_surface_t *surf;
-    cairo_t *cr;
-
-    // delete any existing icon
-    if (item->icon) gtk_widget_destroy (item->icon);
-
-    // create the desktop file name from the app_id
-    str = g_strdup_printf ("%s.desktop", item->launch_id ? item->launch_id : item->app_id);
-    info = (GAppInfo *) g_desktop_app_info_new (str);
-    g_free (str);
-
-    if (info)
-    {
-        // the desktop file name is valid, so just get the icon from it
-        ic = g_app_info_get_icon (info);
-        str = g_icon_to_string (ic);
-        g_object_unref (info);
-    }
-    else
-    {
-        // the desktop file name isn't valid, so search the menu cache for something similar
-        id = menu_cache_id (wl, item->app_id);
-        str = g_strdup_printf ("%s.desktop", id);
-        g_free (id);
-        mitem = menu_cache_find_item_by_id (wl->menu_cache, str);
-        g_free (str);
-
-        if (mitem)
-        {
-            str = g_strdup (menu_cache_item_get_icon (mitem));
-            menu_cache_item_unref (mitem);
-        }
-        else str = NULL;
-    }
-
-    item->icon = gtk_image_new ();
-    gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
-
-    pb = load_taskbar_pixbuf (item->icon, str);
-    surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
-    cr = cairo_create (surf);
-
-    if (item->windows)
-    {
-        dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
-        radius = dim / 6;
-        if (dim == 48) fsize = 10;
-        if (dim == 32) fsize = 7;
-        if (dim == 24) fsize = 5;
-        if (dim == 16) fsize = 3;
-
-        cairo_set_source_rgb (cr, 1 ,1, 1);
-        cairo_arc (cr, dim - radius, dim - radius, radius, 0, 6.3);
-        cairo_fill (cr);
-
-        if (item->windows < 10) buf = g_strdup_printf ("%d", item->windows);
-        else buf = g_strdup ("*");
-        cairo_set_source_rgb (cr, 0, 0, 0);
-        cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-        cairo_set_font_size (cr, fsize);
-        cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
-        cairo_show_text (cr, buf);
-        g_free (buf);
-    }
-
-    gtk_image_set_from_surface (GTK_IMAGE (item->icon), surf);
-    cairo_surface_destroy (surf);
-
-    gtk_widget_show_all (item->btn);
-
-    g_free (str);
-}
-
-static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
-{
-    const char *open, *close;
-    char *tip = NULL, *tmp, *esc;
-    GList *list;
-
-    if (btn->windows == 0)
-    {
-        gtk_widget_set_tooltip_text (btn->btn, btn->tooltip);
-        return;
-    }
-
-    list = wl->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (item->app_id, btn->app_id))
-        {
-            if (item->state & STATE_MINIMISED && item->state & STATE_MAXIMISED)
-            {
-                open = "<b><i>";
-                close = "</i></b>";
-            }
-            else if (item->state & STATE_MINIMISED)
-            {
-                open = "<i>";
-                close = "</i>";
-            }
-            else if (item->state & STATE_MAXIMISED)
-            {
-                open = "<b>";
-                close = "</b>";
-            }
-            else
-            {
-                open = "";
-                close = "";
-            }
-            esc = g_markup_escape_text (item->title, -1);
-            tmp = g_strdup_printf ("%s%s%s%s%s", tip ? tip : "", tip ? "\n" : "", open, esc, close);
-            g_free (esc);
-            if (tip) g_free (tip);
-            tip = tmp;
-        }
-        list = g_list_next (list);
-    }
-
-    gtk_widget_set_tooltip_markup (btn->btn, tip);
-    g_free (tip);
-}
+/*----------------------------------------------------------------------------*/
+/* Right-click menu                                                           */
+/*----------------------------------------------------------------------------*/
 
 static void popup_menu (GtkWidget *widget, gpointer userdata)
 {
@@ -1101,55 +1133,12 @@ static void remove_launcher (GtkWidget *widget, gpointer)
 /* Layout control                                                             */
 /*----------------------------------------------------------------------------*/
 
-static void create_or_update_button (WinlistPlugin *wl, WindowItem *item)
-{
-    WindowBtn *btn;
-    btn = find_btn (wl, item);
-    if (btn)
-    {
-        // found a button already for this app_id - update with new title, state etc
-        btn->windows++;
-        set_icon (wl, btn);
-        btn->app_id = g_strdup (item->app_id);
-        gtk_widget_set_name (btn->btn, item->app_id);
-    }
-    else
-    {
-        // ...and if not, create one
-        btn = g_new0 (WindowBtn, 1);
-        btn->app_id = g_strdup (item->app_id);
-        btn->launch_id = NULL;
-        btn->alt_launch_id = NULL;
-        btn->windows = 1;
-        btn->plugin = wl;
-        btn->launcher = FALSE;
-        create_button (wl, btn);
-        gtk_widget_set_name (btn->btn, item->app_id);
-        wl->buttons = g_list_prepend (wl->buttons, btn);
-    }
-    set_tooltip (wl, btn);
-}
-
 static void update_icons (WinlistPlugin *wl)
 {
-    WindowBtn *btn;
     GList *list;
 
-    // delete the existing widgets and free data
-    list = wl->buttons;
-    while (list)
-    {
-        btn = (WindowBtn *) list->data;
-        gtk_widget_destroy (btn->icon);
-        gtk_widget_destroy (btn->btn);
-        g_free (btn->app_id);
-        g_free (btn->launch_id);
-        g_free (btn->tooltip);
-        list = g_list_next (list);
-    }
-
-    // clear the list of buttons
-    g_list_free (wl->buttons);
+    // delete the existing buttons and free data
+    g_list_free_full (wl->buttons, destroy_button);
     wl->buttons = NULL;
 
     // first load the launchers
@@ -1366,6 +1355,13 @@ static void close_handle (gpointer data, gpointer)
 {
     WindowItem *item = (WindowItem *) data;
     zwlr_foreign_toplevel_handle_v1_destroy (item->handle);
+}
+
+static void destroy_toplevel_entry (gpointer data)
+{
+    WindowItem *item = (WindowItem *) data;
+    if (item->title) g_free (item->title);
+    if (item->app_id) g_free (item->app_id);
 }
 
 void wlist_destructor (gpointer user_data)
