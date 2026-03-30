@@ -915,21 +915,6 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     char *str, *esc;
     gboolean min = FALSE, max = FALSE, unmin = FALSE, unmax = FALSE;
 
-    // find toplevels matching this button's ID, checking window states
-    list = wl->windows;
-    while (list)
-    {
-        app = (WindowItem *) list->data;
-        if (!g_strcmp0 (app->app_id, id))
-        {
-            if (app->state & STATE_MAXIMISED) unmax = TRUE;
-            else max = TRUE;
-            if (app->state & STATE_MINIMISED) unmin = TRUE;
-            else min = TRUE;
-        }
-        list = g_list_next (list);
-    }
-
     menu = gtk_menu_new ();
 
     list = wl->windows;
@@ -952,18 +937,24 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 
             if (app->state & STATE_MINIMISED)
             {
+                unmin = TRUE;
                 label = gtk_bin_get_child (GTK_BIN (item));
                 str = g_strdup_printf ("<i>%s</i>", gtk_label_get_text (GTK_LABEL (label)));
                 gtk_label_set_markup (GTK_LABEL (label), str);
                 g_free (str);
             }
+            else min = TRUE;
+
             if (app->state & STATE_MAXIMISED)
             {
+                unmax = TRUE;
                 label = gtk_bin_get_child (GTK_BIN (item));
                 str = g_strdup_printf ("<b>%s</b>", gtk_label_get_label (GTK_LABEL (label)));
                 gtk_label_set_markup (GTK_LABEL (label), str);
                 g_free (str);
             }
+            else max = TRUE;
+
             g_signal_connect (item, "activate", G_CALLBACK (activate_handle), (void *) app->handle);
             gtk_widget_set_tooltip_text (item, app->title);
             gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
