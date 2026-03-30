@@ -1338,6 +1338,7 @@ void wlist_init (WinlistPlugin *wl)
     gtk_box_set_homogeneous (GTK_BOX (wl->box), TRUE);
     gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
     gtk_container_add (GTK_CONTAINER (wl->plugin), wl->box);
+    gtk_widget_realize (wl->box);
     wl->drag = gdk_cursor_new_for_display (gdk_display_get_default (), GDK_HAND1);
 
     wl->dragon = FALSE;
