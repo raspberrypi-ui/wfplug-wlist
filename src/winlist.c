@@ -94,15 +94,14 @@ static char *find_alternative (const char *launch_id);
 static void add_launcher (WinlistPlugin *wl, char *id);
 static void load_launchers (WinlistPlugin *wl);
 static void remove_launcher (GtkWidget *widget, gpointer);
-static void update_icons (WinlistPlugin *wl);
+static void close_handle (gpointer data, gpointer);
+static void destroy_toplevel_entry (gpointer data);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpointer userdata);
 static void handle_drag_begin (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_update (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
 static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userdata);
-static void close_handle (gpointer data, gpointer);
-static void destroy_toplevel_entry (gpointer data);
 
 /*----------------------------------------------------------------------------*/
 /* Wayland protocol interface                                                 */
@@ -1133,29 +1132,17 @@ static void remove_launcher (GtkWidget *widget, gpointer)
 /* Layout control                                                             */
 /*----------------------------------------------------------------------------*/
 
-static void update_icons (WinlistPlugin *wl)
+static void close_handle (gpointer data, gpointer)
 {
-    GList *list;
+    WindowItem *item = (WindowItem *) data;
+    zwlr_foreign_toplevel_handle_v1_destroy (item->handle);
+}
 
-    // delete the existing buttons and free data
-    g_list_free_full (wl->buttons, destroy_button);
-    wl->buttons = NULL;
-
-    // first load the launchers
-    load_launchers (wl);
-
-    // then go through the list of open windows, adding icons to launchers or adding new icons accordingly
-    list = wl->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        create_or_update_button (wl, item);
-        list = g_list_next (list);
-    }
-    update_button_states (wl);
-
-    gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
-    gtk_widget_queue_allocate (wl->plugin);
+static void destroy_toplevel_entry (gpointer data)
+{
+    WindowItem *item = (WindowItem *) data;
+    if (item->title) g_free (item->title);
+    if (item->app_id) g_free (item->app_id);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1209,10 +1196,7 @@ static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpoin
 
     if (btn->plugin->dragon) return;
 
-    if (pressed == PRESS_LONG)
-    {
-        popup_menu (btn->btn, btn);
-    }
+    if (pressed == PRESS_LONG) popup_menu (btn->btn, btn);
 }
 
 static void handle_drag_begin (GtkGestureDrag *, gdouble x, gdouble, gpointer userdata)
@@ -1307,7 +1291,28 @@ static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userda
 /* Handler for system config changed message from panel */
 void wlist_update_display (WinlistPlugin *wl)
 {
-    update_icons (wl);
+    GList *list;
+    WindowItem *item;
+
+    // delete the existing buttons and free data
+    g_list_free_full (wl->buttons, destroy_button);
+    wl->buttons = NULL;
+
+    // first load the launchers
+    load_launchers (wl);
+
+    // then go through the list of open windows, adding icons to launchers or adding new icons accordingly
+    list = wl->windows;
+    while (list)
+    {
+        item = (WindowItem *) list->data;
+        create_or_update_button (wl, item);
+        list = g_list_next (list);
+    }
+    update_button_states (wl);
+
+    gtk_box_set_spacing (GTK_BOX (wl->box), wl->spacing);
+    gtk_widget_queue_allocate (wl->plugin);
 }
 
 /* Handler for control message */
@@ -1349,19 +1354,6 @@ void wlist_init (WinlistPlugin *wl)
     load_launchers (wl);
 
     if (wl->manager) zwlr_foreign_toplevel_manager_v1_add_listener (wl->manager, &toplevel_manager_v1, wl);
-}
-
-static void close_handle (gpointer data, gpointer)
-{
-    WindowItem *item = (WindowItem *) data;
-    zwlr_foreign_toplevel_handle_v1_destroy (item->handle);
-}
-
-static void destroy_toplevel_entry (gpointer data)
-{
-    WindowItem *item = (WindowItem *) data;
-    if (item->title) g_free (item->title);
-    if (item->app_id) g_free (item->app_id);
 }
 
 void wlist_destructor (gpointer user_data)
