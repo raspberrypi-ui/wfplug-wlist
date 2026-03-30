@@ -58,13 +58,25 @@ conf_table_t conf_table[2] = {
 /* Prototypes                                                                 */
 /*----------------------------------------------------------------------------*/
 
+static void handle_toplevel_title (void *data, HANDLE_PTR handle, const char *title);
+static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *app_id);
+static void handle_toplevel_parent (void *data, HANDLE_PTR handle, HANDLE_PTR parent);
+static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_array *state);
+static void handle_toplevel_done (void *data, HANDLE_PTR handle);
+static void handle_toplevel_closed (void *data, HANDLE_PTR handle);
+static void handle_toplevel_output_enter (void *, HANDLE_PTR, struct wl_output *);
+static void handle_toplevel_output_leave (void *, HANDLE_PTR, struct wl_output *);
+static void handle_manager_toplevel (void *data, MANAGER_PTR, HANDLE_PTR toplevel);
+static void handle_manager_finished (void *data, MANAGER_PTR);
+static void registry_add_object (void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version);
+static void registry_remove_object (void *, struct wl_registry *, uint32_t);
+static void activate_handle (GtkWidget *, gpointer userdata);
 static gboolean activate_app (GtkWidget *, gpointer userdata);
 static void close_app (GtkWidget *, gpointer userdata);
 static void maximise_app (GtkWidget *, gpointer userdata);
 static void unmaximise_app (GtkWidget *, gpointer userdata);
 static void minimise_app (GtkWidget *, gpointer userdata);
 static void unminimise_app (GtkWidget *, gpointer userdata);
-static void activate_handle (GtkWidget *, gpointer userdata);
 static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item);
 static void create_button (WinlistPlugin *wl, WindowBtn *item);
 static void destroy_button (WindowBtn *item);
@@ -340,12 +352,17 @@ static struct wl_registry_listener registry_listener =
 /* Window handle controls                                                     */
 /*----------------------------------------------------------------------------*/
 
-static gboolean activate_app (GtkWidget *wid, gpointer userdata)
+static void activate_handle (GtkWidget *, gpointer userdata)
 {
     GdkDisplay *gdk_display = gdk_display_get_default ();
     GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
     struct wl_seat *wseat  = gdk_wayland_seat_get_wl_seat (seat);
 
+    zwlr_foreign_toplevel_handle_v1_activate ((HANDLE_PTR) userdata, wseat);
+}
+
+static gboolean activate_app (GtkWidget *wid, gpointer userdata)
+{
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     gboolean min = FALSE, act = FALSE;
     GList *list, *new, *prev;
@@ -360,7 +377,7 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
         {
             // if any window is minimised, activate
             // if all windows are unminimised but none are activated, activate
-            // if all windows are visible and one is active, minimise all
+            // if all windows are visible, one is activated, but windows are not contiguous, activate
             if (item->state & STATE_MINIMISED) min = TRUE;  // at least one window minimised
             if (item->state & STATE_ACTIVATED) act = TRUE;  // one window is activated
             if (contig == -1) contig = 1;
@@ -375,11 +392,11 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
     new = NULL;
     while (list)
     {
-        prev = list->prev;
+        prev = g_list_previous (list);
         item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
         {
-            zwlr_foreign_toplevel_handle_v1_activate (item->handle, wseat);
+            activate_handle (NULL, item->handle);
 
             // when an item is activated, move it to the front of a new list...
             wl->windows = g_list_remove_link (wl->windows, list);
@@ -468,15 +485,6 @@ static void unminimise_app (GtkWidget *wid, gpointer userdata)
             zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
         list = g_list_next (list);
     }
-}
-
-static void activate_handle (GtkWidget *, gpointer userdata)
-{
-    GdkDisplay *gdk_display = gdk_display_get_default ();
-    GdkSeat *seat = gdk_display_get_default_seat (gdk_display);
-    struct wl_seat *wseat  = gdk_wayland_seat_get_wl_seat (seat);
-
-    zwlr_foreign_toplevel_handle_v1_activate ((HANDLE_PTR) userdata, wseat);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -735,10 +743,14 @@ static char *menu_cache_id (WinlistPlugin *wl, const char *app_id)
 
 static void set_icon (WinlistPlugin *wl, WindowBtn *item)
 {
-    char *str, *id;
+    char *str, *id, *buf;
     GAppInfo *info;
     GIcon *ic;
     MenuCacheItem *mitem;
+    int fsize, dim, radius;
+    GdkPixbuf *pb;
+    cairo_surface_t *surf;
+    cairo_t *cr;
 
     // delete any existing icon
     if (item->icon) gtk_widget_destroy (item->icon);
@@ -772,15 +784,12 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         else str = NULL;
     }
 
-    int fsize, dim, radius;
-    char *buf;
-
     item->icon = gtk_image_new ();
     gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
 
-    GdkPixbuf *pb = load_taskbar_pixbuf (item->icon, str);
-    cairo_surface_t *surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
-    cairo_t *cr = cairo_create (surf);
+    pb = load_taskbar_pixbuf (item->icon, str);
+    surf = gdk_cairo_surface_create_from_pixbuf (pb, 0, gtk_widget_get_window (wl->box));
+    cr = cairo_create (surf);
 
     if (item->windows)
     {
@@ -795,7 +804,8 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         cairo_arc (cr, dim - radius, dim - radius, radius, 0, 6.3);
         cairo_fill (cr);
 
-        buf = g_strdup_printf ("%d", item->windows < 10 ? item->windows : 9);
+        if (item->windows < 10) buf = g_strdup_printf ("%d", item->windows);
+        else buf = g_strdup ("*");
         cairo_set_source_rgb (cr, 0, 0, 0);
         cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size (cr, fsize);
