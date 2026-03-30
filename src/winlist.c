@@ -69,7 +69,7 @@ static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item);
 static void create_button (WinlistPlugin *wl, WindowBtn *item);
 static void destroy_button (WindowBtn *item);
 static gboolean update_button_states (WinlistPlugin *wl);
-static void free_list_item (gpointer data);
+static void destroy_toplevel_entry (gpointer data);
 static float score_match (const char *str1, const char *str2);
 static char *get_exe (const char *cmdline);
 static char *menu_cache_id (WinlistPlugin *wl, const char *app_id);
@@ -193,30 +193,27 @@ static void handle_toplevel_state (void *data, HANDLE_PTR handle, struct wl_arra
 static void handle_toplevel_done (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
+    WindowItem *item;
     WindowBtn *btn;
     GList *list;
 
     list = wl->windows;
     while (list)
     {
-        WindowItem *item = (WindowItem *) list->data;
+        item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
             if (item->title && item->app_id && !item->parent)
             {
                 if (item->plugin)
                 {
-                    // toplevel already exists - update the icon???
+                    // toplevel already exists - update the tooltip in case the title has changed
                     btn = find_btn (wl, item);
-                    if (btn)
-                    {
-                        set_icon (wl, btn);
-                        set_tooltip (wl, btn);
-                    }
+                    if (btn) set_tooltip (wl, btn);
                 }
                 else
                 {
-                    // new toplevel - look to see if its id is already associated with a button...
+                    // new toplevel - update launcher or create a new button
                     item->plugin = wl;
                     create_or_update_button (wl, item);
                 }
@@ -247,23 +244,28 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
         item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
-            if (!item->parent)
+            if (!item->parent) btn = find_btn (wl, item);
+            else btn = NULL;
+
+            destroy_toplevel_entry (item);
+            wl->windows = g_list_delete_link (wl->windows, list);
+
+            if (btn)
             {
-                btn = find_btn (wl, item);
-                if (btn)
+                btn->windows--;
+                if (!btn->windows && !btn->launcher)
                 {
-                    btn->windows--;
-                    if (!btn->windows && !btn->launcher)
-                    {
-                        // not a launcher and no open windows - remove button
-                        destroy_button (btn);
-                        wl->buttons = g_list_delete_link (wl->buttons, g_list_find (wl->buttons, btn));
-                    }
-                    else set_icon (wl, btn);
+                    // not a launcher and no open windows - remove button
+                    destroy_button (btn);
+                    wl->buttons = g_list_delete_link (wl->buttons, g_list_find (wl->buttons, btn));
+                }
+                else
+                {
+                    // update the window count on the icon and the tooltip
+                    set_icon (wl, btn);
+                    set_tooltip (wl, btn);
                 }
             }
-            free_list_item (item);
-            wl->windows = g_list_delete_link (wl->windows, list);
             break;
         }
         list = g_list_next (list);
@@ -402,7 +404,7 @@ static void close_app (GtkWidget *wid, gpointer userdata)
         WindowItem *item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
             zwlr_foreign_toplevel_handle_v1_close (item->handle);
-        list = list->next;
+        list = g_list_next (list);
     }
 }
 
@@ -419,7 +421,7 @@ static void maximise_app (GtkWidget *wid, gpointer userdata)
             zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
             zwlr_foreign_toplevel_handle_v1_set_maximized (item->handle);
         }
-        list = list->next;
+        list = g_list_next (list);
     }
 }
 
@@ -436,7 +438,7 @@ static void unmaximise_app (GtkWidget *wid, gpointer userdata)
             zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
             zwlr_foreign_toplevel_handle_v1_unset_maximized (item->handle);
         }
-        list = list->next;
+        list = g_list_next (list);
     }
 }
 
@@ -450,7 +452,7 @@ static void minimise_app (GtkWidget *wid, gpointer userdata)
         WindowItem *item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
             zwlr_foreign_toplevel_handle_v1_set_minimized (item->handle);
-        list = list->next;
+        list = g_list_next (list);
     }
 }
 
@@ -464,7 +466,7 @@ static void unminimise_app (GtkWidget *wid, gpointer userdata)
         WindowItem *item = (WindowItem *) list->data;
         if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
             zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
-        list = list->next;
+        list = g_list_next (list);
     }
 }
 
@@ -554,7 +556,7 @@ static gboolean update_button_states (WinlistPlugin *wl)
         {
             item = (WindowItem *) list->data;
             if (!g_strcmp0 (gtk_widget_get_name (btn->btn), item->app_id) && item->state & STATE_ACTIVATED) active = TRUE;
-            list = list->next;
+            list = g_list_next (list);
         }
 
         g_signal_handlers_block_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
@@ -563,12 +565,12 @@ static gboolean update_button_states (WinlistPlugin *wl)
         g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_pressed), btn->plugin);
         g_signal_handlers_unblock_by_func (btn->btn, G_CALLBACK (handle_button_release), btn->plugin);
 
-        btns = btns->next;
+        btns = g_list_next (btns);
     }
     return FALSE;
 }
 
-static void free_list_item (gpointer data)
+static void destroy_toplevel_entry (gpointer data)
 {
     WindowItem *item = (WindowItem *) data;
     if (item->title) g_free (item->title);
@@ -814,7 +816,7 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
 {
     const char *open, *close;
     char *tip = NULL, *tmp, *esc;
-    GList *list = wl->windows;
+    GList *list;
 
     if (btn->windows == 0)
     {
@@ -822,6 +824,7 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
         return;
     }
 
+    list = wl->windows;
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
@@ -853,7 +856,7 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
             if (tip) g_free (tip);
             tip = tmp;
         }
-        list = list->next;
+        list = g_list_next (list);
     }
 
     gtk_widget_set_tooltip_markup (btn->btn, tip);
@@ -883,7 +886,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
             else min = TRUE;
             count++;
         }
-        list = list->next;
+        list = g_list_next (list);
     }
 
     menu = gtk_menu_new ();
@@ -924,7 +927,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
             gtk_widget_set_tooltip_text (item, app->title);
             gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
         }
-        list = list->next;
+        list = g_list_next (list);
     }
 
     if (count)
@@ -1132,7 +1135,7 @@ static void update_icons (WinlistPlugin *wl)
         g_free (btn->app_id);
         g_free (btn->launch_id);
         g_free (btn->tooltip);
-        list = list->next;
+        list = g_list_next (list);
     }
 
     // clear the list of buttons
@@ -1148,7 +1151,7 @@ static void update_icons (WinlistPlugin *wl)
     {
         WindowItem *item = (WindowItem *) list->data;
         create_or_update_button (wl, item);
-        list = list->next;
+        list = g_list_next (list);
     }
     update_button_states (wl);
 
@@ -1178,7 +1181,7 @@ static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gp
     {
         btn = (WindowBtn *) list->data;
         if (btn->btn == wid) break;
-        list = list->next;
+        list = g_list_next (list);
     }
 
     if (wl->dragon)
@@ -1247,7 +1250,7 @@ static void handle_drag_update (GtkGestureDrag *, gdouble x, gdouble, gpointer u
     {
         if (index->data == wl->dragbtn) break;
         moveby++;
-        index = index->next;
+        index = g_list_next (index);
     }
     g_list_free (children);
 
@@ -1283,9 +1286,9 @@ static void handle_drag_end (GtkGestureDrag *, gdouble, gdouble, gpointer userda
                 launchers = tmp;
                 break;
             }
-            btns = btns->next;
+            btns = g_list_next (btns);
         }
-        index = index->next;
+        index = g_list_next (index);
     }
     g_list_free (children);
 
@@ -1369,7 +1372,7 @@ void wlist_destructor (gpointer user_data)
     }
 
     /* Deallocate memory */
-    if (wl->windows) g_list_free_full (wl->windows, (GDestroyNotify) free_list_item);
+    if (wl->windows) g_list_free_full (wl->windows, (GDestroyNotify) destroy_toplevel_entry);
     wl->windows = NULL;
     if (wl->buttons) g_list_free_full (wl->buttons, (GDestroyNotify) destroy_button);
     wl->buttons = NULL;
