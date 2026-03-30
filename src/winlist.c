@@ -910,12 +910,13 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     WindowBtn *btn = (WindowBtn *) userdata;
     WinlistPlugin *wl = btn->plugin;
     const char *id = gtk_widget_get_name (widget);
-    int count = 0;
     WindowItem *app;
-    GList *list = wl->windows;
+    GList *list;
     char *str, *esc;
     gboolean min = FALSE, max = FALSE, unmin = FALSE, unmax = FALSE;
 
+    // find toplevels matching this button's ID, checking window states
+    list = wl->windows;
     while (list)
     {
         app = (WindowItem *) list->data;
@@ -925,7 +926,6 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
             else max = TRUE;
             if (app->state & STATE_MINIMISED) unmin = TRUE;
             else min = TRUE;
-            count++;
         }
         list = g_list_next (list);
     }
@@ -971,7 +971,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         list = g_list_next (list);
     }
 
-    if (count)
+    if (btn->windows)
     {
         item = gtk_separator_menu_item_new ();
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
@@ -979,7 +979,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 
     if (min)
     {
-        item = gtk_menu_item_new_with_label (count > 1 ? _("Hide All") : _("Hide"));
+        item = gtk_menu_item_new_with_label (btn->windows > 1 ? _("Hide All") : _("Hide"));
         gtk_widget_set_name (item, btn->app_id);
         g_signal_connect (item, "activate", G_CALLBACK (minimise_app), wl);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
@@ -987,13 +987,13 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
 
     if (unmin)
     {
-        item = gtk_menu_item_new_with_label (count > 1 ? _("Show All") : _("Show"));
+        item = gtk_menu_item_new_with_label (btn->windows > 1 ? _("Show All") : _("Show"));
         gtk_widget_set_name (item, btn->app_id);
         g_signal_connect (item, "activate", G_CALLBACK (unminimise_app), wl);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
     }
 
-    if (count == 1)
+    if (btn->windows == 1)
     {
         if (max)
         {
@@ -1012,12 +1012,12 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         }
     }
 
-    if (count)
+    if (btn->windows)
     {
         item = gtk_separator_menu_item_new ();
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
 
-        item = gtk_menu_item_new_with_label (count > 1 ? _("Close All") : _("Close"));
+        item = gtk_menu_item_new_with_label (btn->windows > 1 ? _("Close All") : _("Close"));
         gtk_widget_set_name (item, btn->app_id);
         g_signal_connect (item, "activate", G_CALLBACK (close_app), wl);
         gtk_menu_shell_append (GTK_MENU_SHELL (menu), item);
