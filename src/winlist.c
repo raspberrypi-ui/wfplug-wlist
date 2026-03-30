@@ -1120,7 +1120,7 @@ static void remove_launcher (GtkWidget *widget, gpointer)
 }
 
 /*----------------------------------------------------------------------------*/
-/* Layout control                                                             */
+/* Misc                                                                       */
 /*----------------------------------------------------------------------------*/
 
 static void close_handle (gpointer data, gpointer)
@@ -1361,7 +1361,7 @@ void wlist_destructor (gpointer user_data)
         // unref'ing the menu cache causes a segfault because its io thread isn't being closed...
     }
 
-    /* Deallocate memory */
+    // deallocate memory
     if (wl->windows) g_list_free_full (wl->windows, (GDestroyNotify) destroy_toplevel_entry);
     wl->windows = NULL;
     if (wl->buttons) g_list_free_full (wl->buttons, (GDestroyNotify) destroy_button);
