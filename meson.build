@@ -25,5 +25,4 @@ subdir('proto')
 deps = [ wf_protos ]
 
 subdir('src')
-#subdir('po')
-#subdir('data')
+subdir('po')
