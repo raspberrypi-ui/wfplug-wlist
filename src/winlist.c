@@ -96,6 +96,7 @@ static void load_launchers (WinlistPlugin *wl);
 static void remove_launcher (GtkWidget *widget, gpointer);
 static void close_handle (gpointer data, gpointer);
 static void destroy_toplevel_entry (gpointer data);
+static void theme_changed (GtkWidget *, gpointer userdata);
 static gboolean handle_button_pressed (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static gboolean handle_button_release (GtkWidget *widget, GdkEventButton *event, gpointer userdata);
 static void handle_gesture_end (GtkGestureLongPress *, GdkEventSequence *, gpointer userdata);
@@ -563,6 +564,8 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
     char *str, *id, *buf;
     GAppInfo *info;
     GIcon *ic;
+    GtkStyleContext *sc;
+    GdkRGBA col;
     MenuCacheItem *mitem;
     int fsize, dim, radius;
     GdkPixbuf *pb;
@@ -610,6 +613,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
 
     if (item->windows)
     {
+        sc = gtk_widget_get_style_context (wl->plugin);
         dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
         radius = dim / 6;
         if (dim == 48) fsize = 10;
@@ -617,13 +621,15 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         if (dim == 24) fsize = 5;
         if (dim == 16) fsize = 3;
 
-        cairo_set_source_rgb (cr, 1 ,1, 1);
+        gtk_style_context_get_color (sc, GTK_STATE_FLAG_NORMAL, &col);
+        cairo_set_source_rgb (cr, 1 - col.red, 1 - col.green, 1 - col.blue);
         cairo_arc (cr, dim - radius, dim - radius, radius, 0, 6.3);
         cairo_fill (cr);
 
         if (item->windows < 10) buf = g_strdup_printf ("%d", item->windows);
         else buf = g_strdup ("*");
-        cairo_set_source_rgb (cr, 0, 0, 0);
+
+        cairo_set_source_rgb (cr, col.red, col.green, col.blue);
         cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size (cr, fsize);
         cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
@@ -1136,6 +1142,12 @@ static void destroy_toplevel_entry (gpointer data)
     if (item->app_id) g_free (item->app_id);
 }
 
+static void theme_changed (GtkWidget *, gpointer userdata)
+{
+    WinlistPlugin *wl = (WinlistPlugin *) userdata;
+    wlist_update_display (wl);
+}
+
 /*----------------------------------------------------------------------------*/
 /* Handlers                                                                   */
 /*----------------------------------------------------------------------------*/
@@ -1345,6 +1357,8 @@ void wlist_init (WinlistPlugin *wl)
     load_launchers (wl);
 
     if (wl->manager) zwlr_foreign_toplevel_manager_v1_add_listener (wl->manager, &toplevel_manager_v1, wl);
+
+    g_signal_connect (wl->plugin, "style-updated", G_CALLBACK (theme_changed), wl);
 }
 
 void wlist_destructor (gpointer user_data)
