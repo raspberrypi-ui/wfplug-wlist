@@ -1163,7 +1163,7 @@ static gboolean handle_button_pressed (GtkWidget *wid, GdkEventButton *, gpointe
 static gboolean handle_button_release (GtkWidget *wid, GdkEventButton *event, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
-    WindowBtn *btn;
+    WindowBtn *btn = NULL;
 
     GList *list = wl->buttons;
     while (list)
