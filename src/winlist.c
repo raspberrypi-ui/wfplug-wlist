@@ -45,6 +45,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define MAX_MENU_LEN 25
 
+#define STRCMP(a,b) (a && b && !g_strcmp0 (a, b))
+
 /*----------------------------------------------------------------------------*/
 /* Global data                                                                */
 /*----------------------------------------------------------------------------*/
@@ -368,13 +370,14 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
     gboolean min = FALSE, act = FALSE;
     GList *list, *new, *prev;
     WindowItem *item;
+    const char *id = gtk_widget_get_name (wid);
     int contig = -1;    // flag used to detect contiguity of windows - should be 1 if they are all together at the front
 
     list = g_list_last (wl->windows);
     while (list)
     {
         item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        if (STRCMP (item->app_id, id))
         {
             // if any window is minimised, activate
             // if all windows are unminimised but none are activated, activate
@@ -395,7 +398,7 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
     {
         prev = g_list_previous (list);
         item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        if (STRCMP (item->app_id, id))
         {
             activate_handle (NULL, item->handle);
 
@@ -416,12 +419,12 @@ static void close_app (GtkWidget *wid, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
+    const char *id = gtk_widget_get_name (wid);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
-            zwlr_foreign_toplevel_handle_v1_close (item->handle);
+        if (STRCMP (item->app_id, id)) zwlr_foreign_toplevel_handle_v1_close (item->handle);
         list = g_list_next (list);
     }
 }
@@ -430,11 +433,12 @@ static void maximise_app (GtkWidget *wid, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
+    const char *id = gtk_widget_get_name (wid);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        if (STRCMP (item->app_id, id))
         {
             zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
             zwlr_foreign_toplevel_handle_v1_set_maximized (item->handle);
@@ -447,11 +451,12 @@ static void unmaximise_app (GtkWidget *wid, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
+    const char *id = gtk_widget_get_name (wid);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
+        if (STRCMP (item->app_id, id))
         {
             zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
             zwlr_foreign_toplevel_handle_v1_unset_maximized (item->handle);
@@ -464,12 +469,12 @@ static void minimise_app (GtkWidget *wid, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
+    const char *id = gtk_widget_get_name (wid);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
-            zwlr_foreign_toplevel_handle_v1_set_minimized (item->handle);
+        if (STRCMP (item->app_id, id)) zwlr_foreign_toplevel_handle_v1_set_minimized (item->handle);
         list = g_list_next (list);
     }
 }
@@ -478,12 +483,12 @@ static void unminimise_app (GtkWidget *wid, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
+    const char *id = gtk_widget_get_name (wid);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (gtk_widget_get_name (wid), item->app_id))
-            zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
+        if (STRCMP (item->app_id, id)) zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
         list = g_list_next (list);
     }
 }
@@ -491,8 +496,6 @@ static void unminimise_app (GtkWidget *wid, gpointer userdata)
 /*----------------------------------------------------------------------------*/
 /* Button management                                                          */
 /*----------------------------------------------------------------------------*/
-
-#define STRCMP(a,b) (a && b && !g_strcmp0 (a, b))
 
 static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item)
 {
@@ -663,7 +666,7 @@ static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (!g_strcmp0 (item->app_id, btn->app_id))
+        if (STRCMP (item->app_id, btn->app_id))
         {
             if (item->state & STATE_MINIMISED && item->state & STATE_MAXIMISED)
             {
@@ -723,17 +726,19 @@ static gboolean update_button_states (WinlistPlugin *wl)
     gboolean active;
     WindowBtn *btn;
     WindowItem *item;
+    const char *id;
 
     btns = wl->buttons;
     while (btns)
     {
         btn = (WindowBtn *) btns->data;
+        id = gtk_widget_get_name (btn->btn);
         active = FALSE;
         list = wl->windows;
         while (list)
         {
             item = (WindowItem *) list->data;
-            if (!g_strcmp0 (gtk_widget_get_name (btn->btn), item->app_id) && item->state & STATE_ACTIVATED) active = TRUE;
+            if (STRCMP (item->app_id, id) && item->state & STATE_ACTIVATED) active = TRUE;
             list = g_list_next (list);
         }
 
@@ -929,7 +934,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     while (list)
     {
         app = (WindowItem *) list->data;
-        if (!g_strcmp0 (app->app_id, id))
+        if (STRCMP (app->app_id, id))
         {
             esc = g_markup_escape_text (app->title, -1);
             if (strlen (esc) <= MAX_MENU_LEN)
