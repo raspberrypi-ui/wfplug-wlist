@@ -492,6 +492,8 @@ static void unminimise_app (GtkWidget *wid, gpointer userdata)
 /* Button management                                                          */
 /*----------------------------------------------------------------------------*/
 
+#define STRCMP(a,b) (a && b && !g_strcmp0 (a, b))
+
 static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item)
 {
     GList *btns = wl->buttons;
@@ -499,7 +501,7 @@ static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item)
     while (btns)
     {
         WindowBtn *btn = (WindowBtn *) btns->data;
-        if (!g_strcmp0 (mcid, btn->launch_id) || !g_strcmp0 (mcid, btn->alt_launch_id) ||!g_strcmp0 (item->app_id, btn->app_id))
+        if (STRCMP (mcid, btn->launch_id) || STRCMP (mcid, btn->alt_launch_id) || STRCMP (item->app_id, btn->app_id))
         {
             g_free (mcid);
             return btn;
