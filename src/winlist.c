@@ -1316,7 +1316,7 @@ void wlist_update_display (WinlistPlugin *wl)
     while (list)
     {
         item = (WindowItem *) list->data;
-        create_or_update_button (wl, item);
+        if (!item->parent) create_or_update_button (wl, item);
         list = g_list_next (list);
     }
     update_button_states (wl);
