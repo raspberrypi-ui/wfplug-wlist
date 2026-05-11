@@ -621,7 +621,9 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         sc = gtk_widget_get_style_context (wl->plugin);
         dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
         radius = dim / 6;
-        if (dim == 48) fsize = 10;
+        if (dim == 96) fsize = 21;
+        if (dim == 64) fsize = 14;
+        if (dim == 48) fsize = 11;
         if (dim == 32) fsize = 7;
         if (dim == 24) fsize = 5;
         if (dim == 16) fsize = 3;
@@ -637,7 +639,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         cairo_set_source_rgb (cr, col.red, col.green, col.blue);
         cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size (cr, fsize);
-        cairo_move_to (cr, dim - (dim / 4) + 1, dim - (dim / 12));
+        cairo_move_to (cr, dim - fsize, dim - (dim / 12));
         cairo_show_text (cr, buf);
         g_free (buf);
     }
