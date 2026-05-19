@@ -83,7 +83,6 @@ static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item);
 static void create_button (WinlistPlugin *wl, WindowBtn *item);
 static void create_or_update_button (WinlistPlugin *wl, WindowItem *item);
 static void set_icon (WinlistPlugin *wl, WindowBtn *item);
-static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn);
 static void destroy_button (gpointer data);
 static gboolean update_button_states (WinlistPlugin *wl);
 static float score_match (const char *str1, const char *str2);
@@ -209,7 +208,6 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
 {
     WinlistPlugin *wl = (WinlistPlugin*) data;
     WindowItem *item;
-    WindowBtn *btn;
     GList *list;
 
     list = wl->windows;
@@ -220,13 +218,7 @@ static void handle_toplevel_done (void *data, HANDLE_PTR handle)
         {
             if (item->title && item->app_id && !item->parent)
             {
-                if (item->plugin)
-                {
-                    // toplevel already exists - update the tooltip in case the title has changed
-                    btn = find_btn (wl, item);
-                    if (btn) set_tooltip (wl, btn);
-                }
-                else
+                if (!item->plugin)
                 {
                     // new toplevel - update launcher or create a new button
                     item->plugin = wl;
@@ -276,9 +268,8 @@ static void handle_toplevel_closed (void *data, HANDLE_PTR handle)
                 }
                 else
                 {
-                    // update the window count on the icon and the tooltip
+                    // update the window count on the icon
                     set_icon (wl, btn);
-                    set_tooltip (wl, btn);
                 }
             }
             break;
@@ -559,9 +550,9 @@ static void create_or_update_button (WinlistPlugin *wl, WindowItem *item)
         btn->launcher = FALSE;
         create_button (wl, btn);
         gtk_widget_set_name (btn->btn, item->app_id);
+        gtk_widget_set_tooltip_text (btn->btn, btn->tooltip);
         wl->buttons = g_list_prepend (wl->buttons, btn);
     }
-    set_tooltip (wl, btn);
 }
 
 static void set_icon (WinlistPlugin *wl, WindowBtn *item)
@@ -590,6 +581,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         // the desktop file name is valid, so just get the icon from it
         ic = g_app_info_get_icon (info);
         str = g_icon_to_string (ic);
+        item->tooltip = g_strdup (g_app_info_get_name (info));
         g_object_unref (info);
     }
     else
@@ -604,6 +596,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         if (mitem)
         {
             str = g_strdup (menu_cache_item_get_icon (mitem));
+            item->tooltip = g_strdup (menu_cache_item_get_name (mitem));
             menu_cache_item_unref (mitem);
         }
         else str = NULL;
@@ -650,57 +643,6 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
     gtk_widget_show_all (item->btn);
 
     g_free (str);
-}
-
-static void set_tooltip (WinlistPlugin *wl, WindowBtn *btn)
-{
-    const char *open, *close;
-    char *tip = NULL, *tmp, *esc;
-    GList *list;
-
-    if (btn->windows == 0)
-    {
-        gtk_widget_set_tooltip_text (btn->btn, btn->tooltip);
-        return;
-    }
-
-    list = wl->windows;
-    while (list)
-    {
-        WindowItem *item = (WindowItem *) list->data;
-        if (STRCMP (item->app_id, btn->app_id))
-        {
-            if (item->state & STATE_MINIMISED && item->state & STATE_MAXIMISED)
-            {
-                open = "<b><i>";
-                close = "</i></b>";
-            }
-            else if (item->state & STATE_MINIMISED)
-            {
-                open = "<i>";
-                close = "</i>";
-            }
-            else if (item->state & STATE_MAXIMISED)
-            {
-                open = "<b>";
-                close = "</b>";
-            }
-            else
-            {
-                open = "";
-                close = "";
-            }
-            esc = g_markup_escape_text (item->title, -1);
-            tmp = g_strdup_printf ("%s%s%s%s%s", tip ? tip : "", tip ? "\n" : "", open, esc, close);
-            g_free (esc);
-            if (tip) g_free (tip);
-            tip = tmp;
-        }
-        list = g_list_next (list);
-    }
-
-    gtk_widget_set_tooltip_markup (btn->btn, tip);
-    g_free (tip);
 }
 
 static void destroy_button (gpointer data)
