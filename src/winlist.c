@@ -563,7 +563,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
     GtkStyleContext *sc;
     GdkRGBA col;
     MenuCacheItem *mitem;
-    int fsize, dim, radius;
+    int fsize, dimx, dimy, radius;
     GdkPixbuf *pb;
     cairo_surface_t *surf;
     cairo_t *cr;
@@ -612,18 +612,19 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
     if (item->windows)
     {
         sc = gtk_widget_get_style_context (wl->plugin);
-        dim = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
-        radius = dim / 6;
-        if (dim == 96) fsize = 21;
-        if (dim == 64) fsize = 14;
-        if (dim == 48) fsize = 11;
-        if (dim == 32) fsize = 7;
-        if (dim == 24) fsize = 5;
-        if (dim == 16) fsize = 3;
+        dimx = gdk_pixbuf_get_width (pb) / gtk_widget_get_scale_factor (item->btn);
+        dimy = gdk_pixbuf_get_height (pb) / gtk_widget_get_scale_factor (item->btn);
+        radius = dimy / 6;
+        if (dimy == 96) fsize = 21;
+        if (dimy == 64) fsize = 14;
+        if (dimy == 48) fsize = 11;
+        if (dimy == 32) fsize = 7;
+        if (dimy == 24) fsize = 5;
+        if (dimy == 16) fsize = 3;
 
         gtk_style_context_get_color (sc, GTK_STATE_FLAG_NORMAL, &col);
         cairo_set_source_rgb (cr, 1 - col.red, 1 - col.green, 1 - col.blue);
-        cairo_arc (cr, dim - radius, dim - radius, radius, 0, 6.3);
+        cairo_arc (cr, dimx - radius, dimy - radius, radius, 0, 6.3);
         cairo_fill (cr);
 
         if (item->windows < 10) buf = g_strdup_printf ("%d", item->windows);
@@ -632,7 +633,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         cairo_set_source_rgb (cr, col.red, col.green, col.blue);
         cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size (cr, fsize);
-        cairo_move_to (cr, dim - fsize, dim - (dim / 12));
+        cairo_move_to (cr, dimx - fsize, dimy - (dimy / 12));
         cairo_show_text (cr, buf);
         g_free (buf);
     }
