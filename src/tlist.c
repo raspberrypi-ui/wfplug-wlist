@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "lxutils.h"
 #include "launcher.h"
 
-#include "winlist.h"
+#include "tlist.h"
 
 /*----------------------------------------------------------------------------*/
 /* Typedefs and macros                                                        */

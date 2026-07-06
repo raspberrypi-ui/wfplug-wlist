@@ -1,13 +1,10 @@
 <?xml version="1.0"?>
 <wf-panel-pi>
-	<plugin name="panel">
-	<_short>Panel</_short>
+  <plugin name="tlist">
 	<group>
-	<_short>Window List</_short>
-	<option name="tlist_spacing" type="int">
-		<_short>Window List Spacing</_short>
+	  <option name="spacing" type="int">
 		<default>0</default>
-	</option>
+	  </option>
 	</group>
-	</plugin>
+  </plugin>
 </wf-panel-pi>

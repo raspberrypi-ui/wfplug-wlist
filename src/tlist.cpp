@@ -25,42 +25,71 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ============================================================================*/
 
-#ifndef WIDGETS_WINLIST_HPP
-#define WIDGETS_WINLIST_HPP
-
-#include <widget.hpp>
-#include <gtkmm/scrolledwindow.h>
-#include <gtkmm/gesturelongpress.h>
+#include <glibmm.h>
+#include "gtk-utils.hpp"
+#include "tlist.hpp"
 
 extern "C" {
-#include <menu-cache.h>
-#include "lxutils.h"
-#include "winlist.h"
+    WayfireWidget *create () { return new WayfireWinlist; }
+    void destroy (WayfireWidget *w) { delete w; }
+
+    const conf_table_t *config_params (void) { return conf_table; };
+    const char *display_name (void) { return PLUGIN_TITLE; };
+    const char *package_name (void) { return GETTEXT_PACKAGE; };
 }
 
-class WayfireWinlist : public WayfireWidget
+void WayfireWinlist::command (const char *cmd)
 {
-    std::unique_ptr <Gtk::ScrolledWindow> plugin;
+    wlist_control_msg (wl, cmd);
+}
 
-    sigc::connection icon_timer;
+bool WayfireWinlist::set_icon (void)
+{
+    wlist_update_display (wl);
+    return false;
+}
 
-    WfOption <int> spacing {"panel/tlist_spacing"};
-    WfOption <std::string> launchers {"panel/launchers"};
+void WayfireWinlist::read_settings (void)
+{
+    wl->spacing = spacing;
+    wl->launchers = g_strdup (((std::string) launchers).c_str());
+}
 
-    /* plugin */
-    WinlistPlugin *wl;
+void WayfireWinlist::settings_changed_cb (void)
+{
+    read_settings ();
+    wlist_update_display (wl);
+}
 
-  public:
+void WayfireWinlist::init (Gtk::HBox *container)
+{
+    /* Create the button */
+    plugin = std::make_unique <Gtk::ScrolledWindow> ();
+    plugin->set_name (PLUGIN_NAME);
+    plugin->set_propagate_natural_width (true);
+    plugin->set_policy (Gtk::POLICY_EXTERNAL, Gtk::POLICY_NEVER);
 
-    void init (Gtk::HBox *container) override;
-    void command (const char *cmd) override;
-    virtual ~WayfireWinlist ();
-    bool set_icon (void);
-    void read_settings (void);
-    void settings_changed_cb (void);
-};
+    container->pack_start (*plugin, false, false);
 
-#endif /* end of include guard: WIDGETS_WINLIST_HPP */
+    /* Setup structure */
+    wl = g_new0 (WinlistPlugin, 1);
+    wl->plugin = (GtkWidget *)((*plugin).gobj());
+    icon_timer = Glib::signal_idle().connect (sigc::mem_fun (*this, &WayfireWinlist::set_icon));
+
+    /* Initialise the plugin */
+    read_settings ();
+    wlist_init (wl);
+
+    /* Setup callbacks */
+    spacing.set_callback (sigc::mem_fun (*this, &WayfireWinlist::settings_changed_cb));
+    launchers.set_callback (sigc::mem_fun (*this, &WayfireWinlist::settings_changed_cb));
+}
+
+WayfireWinlist::~WayfireWinlist()
+{
+    icon_timer.disconnect ();
+    wlist_destructor (wl);
+}
 
 /* End of file */
 /*----------------------------------------------------------------------------*/

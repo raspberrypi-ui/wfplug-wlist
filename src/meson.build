@@ -3,8 +3,8 @@ wfpanel = dependency('wf-panel-pi')
 menu_cache = dependency('libmenu-cache')
 
 wsources = files(
-  'winlist.c',
-  'winlist.cpp'
+  'tlist.c',
+  'tlist.cpp'
 )
 
 wdeps = [ deps, gtkmm, wfpanel, menu_cache ]
