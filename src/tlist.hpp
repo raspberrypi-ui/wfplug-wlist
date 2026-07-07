@@ -30,7 +30,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <widget.hpp>
 #include <gtkmm/scrolledwindow.h>
-#include <gtkmm/gesturelongpress.h>
 
 extern "C" {
 #include <menu-cache.h>
