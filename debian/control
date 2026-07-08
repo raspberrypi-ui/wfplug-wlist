@@ -12,6 +12,6 @@ Homepage: http://raspberrypi.com/
 Package: wfplug-wlist
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
- wf-panel-pi (>=1.13)
+ wf-panel-pi (>=1.18)
 Description: Icon window list plugin for wf-panel-pi
  Plugin for wf-panel-pi to show icons for quick launch and running tasks.
