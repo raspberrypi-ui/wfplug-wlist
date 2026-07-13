@@ -29,38 +29,38 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "tlist.hpp"
 
 extern "C" {
-    WayfireWidget *create () { return new WayfireWinlist; }
-    void destroy (WayfireWidget *w) { delete w; }
+    PanelWidget *create () { return new WidgetWinlist; }
+    void destroy (PanelWidget *w) { delete w; }
 
     const conf_table_t *config_params (void) { return conf_table; };
     const char *display_name (void) { return PLUGIN_TITLE; };
     const char *package_name (void) { return GETTEXT_PACKAGE; };
 }
 
-void WayfireWinlist::command (const char *cmd)
+void WidgetWinlist::command (const char *cmd)
 {
     wlist_control_msg (wl, cmd);
 }
 
-bool WayfireWinlist::set_icon (void)
+bool WidgetWinlist::set_icon (void)
 {
     wlist_update_display (wl);
     return false;
 }
 
-void WayfireWinlist::read_settings (void)
+void WidgetWinlist::read_settings (void)
 {
     wl->spacing = spacing;
     wl->launchers = g_strdup (((std::string) launchers).c_str());
 }
 
-void WayfireWinlist::settings_changed_cb (void)
+void WidgetWinlist::settings_changed_cb (void)
 {
     read_settings ();
     wlist_update_display (wl);
 }
 
-void WayfireWinlist::init (Gtk::HBox *container)
+void WidgetWinlist::init (Gtk::HBox *container)
 {
     /* Create the button */
     plugin = std::make_unique <Gtk::ScrolledWindow> ();
@@ -73,18 +73,18 @@ void WayfireWinlist::init (Gtk::HBox *container)
     /* Setup structure */
     wl = g_new0 (WinlistPlugin, 1);
     wl->plugin = (GtkWidget *)((*plugin).gobj());
-    icon_timer = Glib::signal_idle().connect (sigc::mem_fun (*this, &WayfireWinlist::set_icon));
+    icon_timer = Glib::signal_idle().connect (sigc::mem_fun (*this, &WidgetWinlist::set_icon));
 
     /* Initialise the plugin */
     read_settings ();
     wlist_init (wl);
 
     /* Setup callbacks */
-    spacing.set_callback (sigc::mem_fun (*this, &WayfireWinlist::settings_changed_cb));
-    launchers.set_callback (sigc::mem_fun (*this, &WayfireWinlist::settings_changed_cb));
+    spacing.set_callback (sigc::mem_fun (*this, &WidgetWinlist::settings_changed_cb));
+    launchers.set_callback (sigc::mem_fun (*this, &WidgetWinlist::settings_changed_cb));
 }
 
-WayfireWinlist::~WayfireWinlist()
+WidgetWinlist::~WidgetWinlist()
 {
     icon_timer.disconnect ();
     wlist_destructor (wl);

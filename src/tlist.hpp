@@ -37,7 +37,7 @@ extern "C" {
 #include "tlist.h"
 }
 
-class WayfireWinlist : public WayfireWidget
+class WidgetWinlist : public PanelWidget
 {
     std::unique_ptr <Gtk::ScrolledWindow> plugin;
 
@@ -53,7 +53,7 @@ class WayfireWinlist : public WayfireWidget
 
     void init (Gtk::HBox *container) override;
     void command (const char *cmd) override;
-    virtual ~WayfireWinlist ();
+    virtual ~WidgetWinlist ();
     bool set_icon (void);
     void read_settings (void);
     void settings_changed_cb (void);
