@@ -50,13 +50,20 @@ bool WidgetWinlist::set_icon (void)
 
 void WidgetWinlist::read_settings (void)
 {
-    wl->spacing = spacing;
-    wl->launchers = g_strdup (((std::string) launchers).c_str());
+    conf_table[0].value = (void *) &wl->spacing;
+
+    load_configuration_data (PLUGIN_NAME, conf_table);
+
+    get_config_string ("panel", "launchers", &wl->launchers, "");
 }
 
-void WidgetWinlist::settings_changed_cb (void)
+void WidgetWinlist::handle_config_reload (void)
 {
-    read_settings ();
+    load_configuration_data (PLUGIN_NAME, conf_table);
+
+    g_free (wl->launchers);
+    get_config_string ("panel", "launchers", &wl->launchers, "");
+
     wlist_update_display (wl);
 }
 
@@ -78,10 +85,6 @@ void WidgetWinlist::init (Gtk::HBox *container)
     /* Initialise the plugin */
     read_settings ();
     wlist_init (wl);
-
-    /* Setup callbacks */
-    spacing.set_callback (sigc::mem_fun (*this, &WidgetWinlist::settings_changed_cb));
-    launchers.set_callback (sigc::mem_fun (*this, &WidgetWinlist::settings_changed_cb));
 }
 
 WidgetWinlist::~WidgetWinlist()

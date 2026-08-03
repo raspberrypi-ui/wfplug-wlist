@@ -43,9 +43,6 @@ class WidgetWinlist : public PanelWidget
 
     sigc::connection icon_timer;
 
-    WfOption <int> spacing {"tlist/spacing"};
-    WfOption <std::string> launchers {"panel/launchers"};
-
     /* plugin */
     WinlistPlugin *wl;
 
@@ -56,7 +53,7 @@ class WidgetWinlist : public PanelWidget
     virtual ~WidgetWinlist ();
     bool set_icon (void);
     void read_settings (void);
-    void settings_changed_cb (void);
+    void handle_config_reload (void);
 };
 
 #endif /* end of include guard: WIDGETS_WINLIST_HPP */
