@@ -48,23 +48,17 @@ bool WidgetWinlist::set_icon (void)
     return false;
 }
 
-void WidgetWinlist::read_settings (void)
-{
-    conf_table[0].value = (void *) &wl->spacing;
-
-    load_configuration_data (PLUGIN_NAME, conf_table);
-
-    get_config_string ("panel", "launchers", &wl->launchers, "");
-}
-
 void WidgetWinlist::handle_config_reload (void)
 {
-    load_configuration_data (PLUGIN_NAME, conf_table);
+    gboolean changed = load_configuration_data (PLUGIN_NAME, conf_table);
 
+    char *ostr = g_strdup (wl->launchers);
     g_free (wl->launchers);
     get_config_string ("panel", "launchers", &wl->launchers, "");
+    if (g_strcmp0 (wl->launchers, ostr)) changed = TRUE;
+    g_free (ostr);
 
-    wlist_update_display (wl);
+    if (changed) wlist_update_display (wl);
 }
 
 void WidgetWinlist::init (Gtk::HBox *container)
@@ -83,7 +77,9 @@ void WidgetWinlist::init (Gtk::HBox *container)
     icon_timer = Glib::signal_idle().connect (sigc::mem_fun (*this, &WidgetWinlist::set_icon));
 
     /* Initialise the plugin */
-    read_settings ();
+    wlist_set_values (wl);
+    load_configuration_data (PLUGIN_NAME, conf_table);
+    get_config_string ("panel", "launchers", &wl->launchers, "");
     wlist_init (wl);
 }
 
