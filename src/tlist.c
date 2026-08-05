@@ -1355,7 +1355,8 @@ void wlist_destructor (gpointer user_data)
 
     // stop the window manager
     g_list_foreach (wl->windows, (GFunc) close_handle, wl);
-    if (wl->manager) zwlr_foreign_toplevel_manager_v1_stop (wl->manager);
+    if (wl->manager) zwlr_foreign_toplevel_manager_v1_destroy (wl->manager);
+    wl->manager = NULL;
 
     if (wl->menu_cache)
     {
