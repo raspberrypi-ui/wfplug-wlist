@@ -37,18 +37,17 @@ extern "C" {
     const char *package_name (void) { return GETTEXT_PACKAGE; };
 }
 
-void WidgetWinlist::command (const char *cmd)
+void WidgetWinlist::widget_command (const char *cmd)
 {
     wlist_control_msg (wl, cmd);
 }
 
-bool WidgetWinlist::set_icon (void)
+void WidgetWinlist::widget_set_icon (void)
 {
     wlist_update_display (wl);
-    return false;
 }
 
-void WidgetWinlist::handle_config_reload (void)
+void WidgetWinlist::widget_config_reload (void)
 {
     gboolean changed = load_configuration_data (PLUGIN_NAME, conf_table);
 
@@ -61,7 +60,7 @@ void WidgetWinlist::handle_config_reload (void)
     if (changed) wlist_update_display (wl);
 }
 
-void WidgetWinlist::init (Gtk::HBox *container)
+void WidgetWinlist::widget_init (Gtk::HBox *container)
 {
     /* Create the button */
     plugin = std::make_unique <Gtk::ScrolledWindow> ();
@@ -74,7 +73,6 @@ void WidgetWinlist::init (Gtk::HBox *container)
     /* Setup structure */
     wl = g_new0 (WinlistPlugin, 1);
     wl->plugin = (GtkWidget *)((*plugin).gobj());
-    icon_timer = Glib::signal_idle().connect (sigc::mem_fun (*this, &WidgetWinlist::set_icon));
 
     /* Initialise the plugin */
     wlist_set_values (wl);
@@ -85,7 +83,6 @@ void WidgetWinlist::init (Gtk::HBox *container)
 
 WidgetWinlist::~WidgetWinlist()
 {
-    icon_timer.disconnect ();
     wlist_destructor (wl);
 }
 

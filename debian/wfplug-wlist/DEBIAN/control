@@ -1,0 +1,11 @@
+Package: wfplug-wlist
+Version: 0.4
+Architecture: arm64
+Maintainer: Simon Long <simon@raspberrypi.com>
+Installed-Size: 84
+Depends: libc6 (>= 2.17), libcairo2 (>= 1.2.4), libgcc-s1 (>= 3.0), libgdk-pixbuf-2.0-0 (>= 2.22.0), libglib2.0-0t64 (>= 2.28.0), libglibmm-2.4-1t64 (>= 2.66.8), libgtk-3-0t64 (>= 3.19.12), libgtkmm-3.0-1t64 (>= 3.24.10), libmenu-cache3 (>= 0.5.0), libstdc++6 (>= 12), libwayland-client0 (>= 1.20.0), wf-panel-pi (>= 1.23)
+Section: x11
+Priority: optional
+Homepage: http://raspberrypi.com/
+Description: Icon window list plugin for wf-panel-pi
+ Plugin for wf-panel-pi to show icons for quick launch and running tasks.
