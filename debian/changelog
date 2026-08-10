@@ -1,3 +1,9 @@
+wfplug-wlist (0.5) trixie; urgency=medium
+
+  * Fix for crash caused by window list reload
+
+ -- Simon Long <simon@raspberrypi.com>  Mon, 10 Aug 2026 14:57:07 +0100
+
 wfplug-wlist (0.4) trixie; urgency=medium
 
   * Modify for latest plugin architecture
