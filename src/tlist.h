@@ -38,14 +38,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define STATE_MAXIMISED 0x02
 #define STATE_MINIMISED 0x04
 
-typedef struct 
+typedef struct
 {
     GtkWidget *plugin;
     GtkWidget *box;
 
     GList *buttons;
-
-    GList *windows;
 
     char *launchers;                /* List of launchers */
 
@@ -56,20 +54,17 @@ typedef struct
     GdkCursor *drag;
     gboolean dragon;
 
-    struct zwlr_foreign_toplevel_manager_v1 *manager;
-
     MenuCache* menu_cache;
-    gpointer reload_notify;
 } WinlistPlugin;
 
 typedef struct
 {
-    WinlistPlugin *plugin;
     void *handle;
     void *parent;
     char *app_id;
     char *title;
     int state;
+    gboolean button_created;
 } WindowItem;
 
 typedef struct
