@@ -45,6 +45,8 @@ typedef struct
 
     GList *buttons;
 
+    GList *windows;
+
     char *launchers;                /* List of launchers */
 
     int spacing;
@@ -54,17 +56,21 @@ typedef struct
     GdkCursor *drag;
     gboolean dragon;
 
+    struct wl_registry *registry;
+    struct zwlr_foreign_toplevel_manager_v1 *manager;
+
     MenuCache* menu_cache;
+    gpointer reload_notify;
 } WinlistPlugin;
 
 typedef struct
 {
+    WinlistPlugin *plugin;
     void *handle;
     void *parent;
     char *app_id;
     char *title;
     int state;
-    gboolean button_created;
 } WindowItem;
 
 typedef struct
