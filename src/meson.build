@@ -9,7 +9,7 @@ wsources = files(
 
 wdeps = [ deps, gtkmm, wfpanel, menu_cache ]
 
-wargs = [ '-DPACKAGE_DATA_DIR="' + wresource_dir + '"', '-DGETTEXT_PACKAGE="wfplug_' + meson.project_name() +'"' ]
+wargs = [ '-DPACKAGE_DATA_DIR="' + wresource_dir + '"', '-DGETTEXT_PACKAGE="wfplug_' + meson.project_name() +'"', '-DUSES_MENUCACHE' ]
 
 shared_module('lib' + meson.project_name(), wsources,
         dependencies: wdeps,
