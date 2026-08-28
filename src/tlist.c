@@ -31,7 +31,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <gdk/gdkwayland.h>
 
 #include "plugin.h"
-#include "launcher.h"
 
 #include "tlist.h"
 
