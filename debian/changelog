@@ -1,3 +1,9 @@
+wfplug-wlist (0.6) trixie; urgency=medium
+
+  * Modify for new lxpanel shims
+
+ -- Simon Long <simon@raspberrypi.com>  Fri, 28 Aug 2026 10:45:08 +0100
+
 wfplug-wlist (0.5) trixie; urgency=medium
 
   * Fix for crash caused by window list reload
