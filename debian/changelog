@@ -1,3 +1,9 @@
+wfplug-wlist (0.8) trixie; urgency=medium
+
+  * Do not display invalid launchers
+
+ -- Simon Long <simon@raspberrypi.com>  Thu, 10 Sep 2026 20:40:26 +0100
+
 wfplug-wlist (0.7) trixie; urgency=medium
 
   * Version bump for build

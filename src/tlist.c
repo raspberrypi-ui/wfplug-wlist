@@ -594,7 +594,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         item->tooltip = g_strdup (g_app_info_get_name (info));
         g_object_unref (info);
     }
-    else
+    else if (item->app_id)
     {
         // the desktop file name isn't valid, so search the menu cache for something similar
         mitem = get_cache_item (item->app_id);
@@ -606,6 +606,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         }
         else str = NULL;
     }
+    else str = NULL;
 
     item->icon = gtk_image_new ();
     gtk_container_add (GTK_CONTAINER (item->btn), item->icon);
@@ -883,6 +884,11 @@ static void add_launcher (WinlistPlugin *wl, char *id)
     char *str;
     GAppInfo *info;
 
+    str = g_strdup_printf ("%s.desktop", id);
+    info = (GAppInfo *) g_desktop_app_info_new (str);
+    g_free (str);
+    if (!info) return;
+
     wbtn = g_new0 (WindowBtn, 1);
     wbtn->launch_id = g_strdup (id);
     wbtn->alt_launch_id = find_alternative (id);
@@ -890,16 +896,13 @@ static void add_launcher (WinlistPlugin *wl, char *id)
     wbtn->windows = 0;
     wbtn->plugin = wl;
     wbtn->launcher = TRUE;
+    wbtn->tooltip = g_strdup (g_app_info_get_name (info));
     create_button (wl, wbtn);
     gtk_widget_set_name (wbtn->btn, id);
+    gtk_widget_set_tooltip_text (wbtn->btn, wbtn->tooltip);
 
-    str = g_strdup_printf ("%s.desktop", id);
-    info = (GAppInfo *) g_desktop_app_info_new (str);
-    g_free (str);
-    wbtn->tooltip = g_strdup (g_app_info_get_name (info));
     g_object_unref (info);
 
-    gtk_widget_set_tooltip_text (wbtn->btn, wbtn->tooltip);
     wl->buttons = g_list_prepend (wl->buttons, wbtn);
 }
 
