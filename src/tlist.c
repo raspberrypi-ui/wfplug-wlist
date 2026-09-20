@@ -142,7 +142,7 @@ static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *a
         if (item->handle == (void *) handle)
         {
             if (!item->app_id) item->app_id = g_strdup (app_id);
-            else
+            else if (strcmp (item->app_id, app_id))
             {
                 // if the app id changes on an existing button, delete it and create a new one
                 if (!item->parent) btn = find_btn (wl, item);
