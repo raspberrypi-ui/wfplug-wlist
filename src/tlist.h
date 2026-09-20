@@ -83,6 +83,7 @@ typedef struct
     GtkGesture *gesture;
     GtkGesture *dgesture;
     gboolean launcher;
+    void *handle;
 } WindowBtn;
 
 

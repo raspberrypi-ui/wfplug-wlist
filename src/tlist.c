@@ -44,6 +44,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MAX_MENU_LEN 25
 
 #define STRCMP(a,b) (a && b && !g_strcmp0 (a, b))
+#define HANDCMP(a,b) (a && b && a == b)
 
 /*----------------------------------------------------------------------------*/
 /* Global data                                                                */
@@ -72,6 +73,7 @@ static void registry_add_object (void *data, struct wl_registry *registry, uint3
 static void registry_remove_object (void *, struct wl_registry *, uint32_t);
 static void activate_handle (GtkWidget *, gpointer userdata);
 static gboolean activate_app (GtkWidget *, gpointer userdata);
+static void *get_button_handle (WinlistPlugin *wl, const char *id);
 static void close_app (GtkWidget *, gpointer userdata);
 static void maximise_app (GtkWidget *, gpointer userdata);
 static void unmaximise_app (GtkWidget *, gpointer userdata);
@@ -372,13 +374,14 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
     GList *list, *new, *prev;
     WindowItem *item;
     const char *id = gtk_widget_get_name (wid);
+    void *btn_handle = get_button_handle (wl, id);
     int contig = -1;    // flag used to detect contiguity of windows - should be 1 if they are all together at the front
 
     list = g_list_last (wl->windows);
     while (list)
     {
         item = (WindowItem *) list->data;
-        if (STRCMP (item->app_id, id))
+        if (STRCMP (item->app_id, id) || HANDCMP (item->handle, btn_handle))
         {
             // if any window is minimised, activate
             // if all windows are unminimised but none are activated, activate
@@ -399,7 +402,7 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
     {
         prev = g_list_previous (list);
         item = (WindowItem *) list->data;
-        if (STRCMP (item->app_id, id))
+        if (STRCMP (item->app_id, id) || HANDCMP (item->handle, btn_handle))
         {
             activate_handle (NULL, item->handle);
 
@@ -416,16 +419,30 @@ static gboolean activate_app (GtkWidget *wid, gpointer userdata)
     return TRUE;
 }
 
+static void *get_button_handle (WinlistPlugin *wl, const char *id)
+{
+    GList *list;
+    list = wl->buttons;
+    while (list)
+    {
+        WindowBtn *btn = (WindowBtn *) list->data;
+        if (STRCMP (btn->app_id, id)) return btn->handle;
+        list = g_list_next (list);
+    }
+    return NULL;
+}
+
 static void close_app (GtkWidget *wid, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
     const char *id = gtk_widget_get_name (wid);
+    void *btn_handle = get_button_handle (wl, id);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (STRCMP (item->app_id, id)) zwlr_foreign_toplevel_handle_v1_close (item->handle);
+        if (STRCMP (item->app_id, id) || HANDCMP (item->handle, btn_handle)) zwlr_foreign_toplevel_handle_v1_close (item->handle);
         list = g_list_next (list);
     }
 }
@@ -435,11 +452,12 @@ static void maximise_app (GtkWidget *wid, gpointer userdata)
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
     const char *id = gtk_widget_get_name (wid);
+    void *btn_handle = get_button_handle (wl, id);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (STRCMP (item->app_id, id))
+        if (STRCMP (item->app_id, id) || HANDCMP (item->handle, btn_handle))
         {
             zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
             zwlr_foreign_toplevel_handle_v1_set_maximized (item->handle);
@@ -453,11 +471,12 @@ static void unmaximise_app (GtkWidget *wid, gpointer userdata)
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
     const char *id = gtk_widget_get_name (wid);
+    void *btn_handle = get_button_handle (wl, id);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (STRCMP (item->app_id, id))
+        if (STRCMP (item->app_id, id) || HANDCMP (item->handle, btn_handle))
         {
             zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
             zwlr_foreign_toplevel_handle_v1_unset_maximized (item->handle);
@@ -471,11 +490,13 @@ static void minimise_app (GtkWidget *wid, gpointer userdata)
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
     const char *id = gtk_widget_get_name (wid);
+    void *btn_handle = get_button_handle (wl, id);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (STRCMP (item->app_id, id)) zwlr_foreign_toplevel_handle_v1_set_minimized (item->handle);
+        if (STRCMP (item->app_id, id) || HANDCMP (item->handle, btn_handle))
+            zwlr_foreign_toplevel_handle_v1_set_minimized (item->handle);
         list = g_list_next (list);
     }
 }
@@ -485,11 +506,13 @@ static void unminimise_app (GtkWidget *wid, gpointer userdata)
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list = wl->windows;
     const char *id = gtk_widget_get_name (wid);
+    void *btn_handle = get_button_handle (wl, id);
 
     while (list)
     {
         WindowItem *item = (WindowItem *) list->data;
-        if (STRCMP (item->app_id, id)) zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
+        if (STRCMP (item->app_id, id) || HANDCMP (item->handle, btn_handle))
+            zwlr_foreign_toplevel_handle_v1_unset_minimized (item->handle);
         list = g_list_next (list);
     }
 }
@@ -505,7 +528,8 @@ static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item)
     while (btns)
     {
         WindowBtn *btn = (WindowBtn *) btns->data;
-        if (STRCMP (mcid, btn->launch_id) || STRCMP (mcid, btn->alt_launch_id) || STRCMP (item->app_id, btn->app_id))
+        if (HANDCMP (item->handle, btn->handle) || STRCMP (mcid, btn->launch_id) ||
+            STRCMP (mcid, btn->alt_launch_id) || STRCMP (item->app_id, btn->app_id))
         {
             g_free (mcid);
             return btn;
@@ -558,6 +582,7 @@ static void create_or_update_button (WinlistPlugin *wl, WindowItem *item)
         btn->windows = 1;
         btn->plugin = wl;
         btn->launcher = FALSE;
+        btn->handle = item->handle;
         create_button (wl, btn);
         gtk_widget_set_name (btn->btn, item->app_id);
         gtk_widget_set_tooltip_text (btn->btn, btn->tooltip);
@@ -714,6 +739,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     WindowBtn *btn = (WindowBtn *) userdata;
     WinlistPlugin *wl = btn->plugin;
     const char *id = gtk_widget_get_name (widget);
+    void *btn_handle = get_button_handle (wl, id);
     WindowItem *app;
     GList *list;
     char *str, *esc;
@@ -725,7 +751,7 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
     while (list)
     {
         app = (WindowItem *) list->data;
-        if (STRCMP (app->app_id, id))
+        if (STRCMP (app->app_id, id) || HANDCMP (app->handle, btn_handle))
         {
             esc = g_markup_escape_text (app->title, -1);
             if (strlen (esc) <= MAX_MENU_LEN)
@@ -896,6 +922,7 @@ static void add_launcher (WinlistPlugin *wl, char *id)
     wbtn->windows = 0;
     wbtn->plugin = wl;
     wbtn->launcher = TRUE;
+    wbtn->handle = NULL;
     wbtn->tooltip = g_strdup (g_app_info_get_name (info));
     create_button (wl, wbtn);
     gtk_widget_set_name (wbtn->btn, id);
