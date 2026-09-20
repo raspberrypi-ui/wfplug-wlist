@@ -133,6 +133,7 @@ static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *a
     WinlistPlugin *wl = (WinlistPlugin *) data;
     WindowItem *item;
     GList *list;
+    WindowBtn *btn;
 
     list = wl->windows;
     while (list)
@@ -140,7 +141,35 @@ static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *a
         item = (WindowItem *) list->data;
         if (item->handle == (void *) handle)
         {
-            item->app_id = g_strdup (app_id);
+            if (!item->app_id) item->app_id = g_strdup (app_id);
+            else
+            {
+                // if the app id changes on an existing button, delete it and create a new one
+                if (!item->parent) btn = find_btn (wl, item);
+                else btn = NULL;
+
+                if (btn)
+                {
+                    btn->windows--;
+                    if (!btn->windows && !btn->launcher)
+                    {
+                        // not a launcher and no open windows - remove button
+                        destroy_button (btn);
+                        wl->buttons = g_list_delete_link (wl->buttons, g_list_find (wl->buttons, btn));
+                    }
+                    else
+                    {
+                        // update the window count on the icon
+                        set_icon (wl, btn);
+                    }
+                }
+
+                g_free (item->app_id);
+                item->app_id = g_strdup (app_id);
+
+                // clear the plugin flag to force creation of new button
+                item->plugin = NULL;
+            }
             break;
         }
         list = g_list_next (list);
