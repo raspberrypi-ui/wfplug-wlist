@@ -162,10 +162,10 @@ static void handle_toplevel_app_id (void *data, HANDLE_PTR handle, const char *a
                         // update the window count on the icon
                         set_icon (wl, btn);
                     }
-
-                    // clear the plugin flag to force creation of new button for this item
-                    if (!btn->windows) item->plugin = NULL;
                 }
+
+                // clear the plugin flag to force creation of new button for this item
+                item->plugin = NULL;
 
                 g_free (item->app_id);
                 item->app_id = g_strdup (app_id);
