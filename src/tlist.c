@@ -666,7 +666,7 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
         else buf = g_strdup ("*");
 
         cairo_set_source_rgb (cr, col.red, col.green, col.blue);
-        cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_select_font_face (cr, "Noto Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size (cr, fsize);
         cairo_move_to (cr, dimx - fsize, dimy - (dimy / 12));
         cairo_show_text (cr, buf);
