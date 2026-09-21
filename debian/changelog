@@ -1,3 +1,9 @@
+wfplug-wlist (0.9) trixie; urgency=medium
+
+  * Handle applications whose app-id changes while running
+
+ -- Simon Long <simon@raspberrypi.com>  Mon, 21 Sep 2026 08:05:46 +0100
+
 wfplug-wlist (0.8) trixie; urgency=medium
 
   * Do not display invalid launchers
