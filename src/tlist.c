@@ -758,35 +758,36 @@ static void popup_menu (GtkWidget *widget, gpointer userdata)
         {
             esc = g_markup_escape_text (app->title, -1);
             if (strlen (esc) <= MAX_MENU_LEN)
-                item = gtk_menu_item_new_with_label (esc);
+                str = g_strdup (esc);
             else
             {
                 str = g_strndup (esc, MAX_MENU_LEN);
                 sprintf (str + MAX_MENU_LEN - 3, "...");
-                item = gtk_menu_item_new_with_label (str);
-                g_free (str);
             }
             g_free (esc);
 
             if (app->state & STATE_MINIMISED)
             {
                 unmin = TRUE;
-                label = gtk_bin_get_child (GTK_BIN (item));
-                str = g_strdup_printf ("<i>%s</i>", gtk_label_get_text (GTK_LABEL (label)));
-                gtk_label_set_markup (GTK_LABEL (label), str);
+                esc = g_strdup_printf ("<i>%s</i>", str);
                 g_free (str);
+                str = esc;
             }
             else min = TRUE;
 
             if (app->state & STATE_MAXIMISED)
             {
                 unmax = TRUE;
-                label = gtk_bin_get_child (GTK_BIN (item));
-                str = g_strdup_printf ("<b>%s</b>", gtk_label_get_label (GTK_LABEL (label)));
-                gtk_label_set_markup (GTK_LABEL (label), str);
+                esc = g_strdup_printf ("<b>%s</b>", str);
                 g_free (str);
+                str = esc;
             }
             else max = TRUE;
+
+            item = gtk_menu_item_new_with_label ("");
+            label = gtk_bin_get_child (GTK_BIN (item));
+            gtk_label_set_markup (GTK_LABEL (label), str);
+            g_free (str);
 
             g_signal_connect (item, "activate", G_CALLBACK (activate_handle), (void *) app->handle);
             gtk_widget_set_tooltip_text (item, app->title);

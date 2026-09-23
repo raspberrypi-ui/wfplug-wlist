@@ -1,3 +1,9 @@
+wfplug-wlist (0.11) trixie; urgency=medium
+
+  * Fix markup on menu entries
+
+ -- Simon Long <simon@raspberrypi.com>  Wed, 23 Sep 2026 07:48:30 +0100
+
 wfplug-wlist (0.10) trixie; urgency=medium
 
   * Use exact font definition rather than alias to fix Japanese window counts
