@@ -975,7 +975,15 @@ static void destroy_toplevel_entry (gpointer data)
 static void theme_changed (GtkWidget *, gpointer userdata)
 {
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
-    wlist_update_display (wl);
+    GList *list;
+
+    // loop throuhg all buttons, reloading icons - rebuilding the buttons causes order to change
+    list = wl->buttons;
+    while (list)
+    {
+        set_icon (wl, (WindowBtn *) list->data);
+        list = g_list_next (list);
+    }
 }
 
 /*----------------------------------------------------------------------------*/

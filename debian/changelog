@@ -1,3 +1,9 @@
+wfplug-wlist (0.12) trixie; urgency=medium
+
+  * Fix buttons re-ordering when icon theme updates
+
+ -- Simon Long <simon@raspberrypi.com>  Thu, 15 Oct 2026 15:08:17 +0100
+
 wfplug-wlist (0.11) trixie; urgency=medium
 
   * Fix markup on menu entries
