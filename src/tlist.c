@@ -574,6 +574,7 @@ static void create_or_update_button (WinlistPlugin *wl, WindowItem *item)
         // found a button already for this app_id - update with new title, state etc
         btn->windows++;
         set_icon (wl, btn);
+        g_free (btn->app_id);
         btn->app_id = g_strdup (item->app_id);
         gtk_widget_set_name (btn->btn, item->app_id);
     }
