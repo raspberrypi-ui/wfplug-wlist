@@ -85,7 +85,6 @@ static void destroy_button (gpointer data);
 static gboolean update_button_states (WinlistPlugin *wl);
 static void popup_menu (GtkWidget *widget, gpointer userdata);
 static void launch_id (GtkWidget *widget);
-static char *get_string (char *cmd);
 static char *find_alternative (const char *launch_id);
 static void add_launcher (WinlistPlugin *wl, char *id);
 static void load_launchers (WinlistPlugin *wl);
@@ -884,32 +883,15 @@ static void launch_id (GtkWidget *widget)
     g_free (str);
 }
 
-static char *get_string (char *cmd)
-{
-    char *line = NULL, *res = NULL;
-    size_t len = 0;
-    FILE *fp = popen (cmd, "r");
-
-    if (fp == NULL) return NULL;
-    if (getline (&line, &len, fp) > 0)
-    {
-        res = line;
-        while (*res)
-        {
-            if (g_ascii_isspace (*res)) *res = 0;
-            res++;
-        }
-        res = g_strdup (line);
-    }
-    pclose (fp);
-    g_free (line);
-    return res;
-}
-
 static char *find_alternative (const char *launch_id)
 {
-    char *cmd = g_strdup_printf ("update-alternatives --query %s 2> /dev/null| grep Value | cut -d ' ' -f 2 | rev | cut -d / -f 1 | rev", launch_id);
-    return get_string (cmd);
+    // the currently selected alternative is the target of the symlink /etc/alternatives/<launch_id>
+    char *path = g_strdup_printf ("/etc/alternatives/%s", launch_id);
+    char *target = g_file_read_link (path, NULL);
+    char *res = target ? g_path_get_basename (target) : NULL;
+    g_free (path);
+    g_free (target);
+    return res;
 }
 
 static void add_launcher (WinlistPlugin *wl, char *id)
