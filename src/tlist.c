@@ -874,9 +874,12 @@ static void launch_id (GtkWidget *widget)
     str = g_strdup_printf ("%s.desktop", lid);
     info = (GAppInfo *) g_desktop_app_info_new (str);
 
-    g_app_info_launch (info, NULL, NULL, NULL);
+    if (info)
+    {
+        g_app_info_launch (info, NULL, NULL, NULL);
+        g_object_unref (info);
+    }
 
-    g_object_unref (info);
     g_free (lid);
     g_free (str);
 }
