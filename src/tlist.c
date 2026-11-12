@@ -540,7 +540,7 @@ static WindowBtn *find_btn (WinlistPlugin *wl, WindowItem *item)
 
         if (btn->alternative) alt = find_alternative (btn->launch_id);
 
-        if (STRCMP (mcid, (alt ? alt : btn->launch_id)) || STRCMP (item->app_id, btn->app_id))
+        if (STRCMP (mcid, btn->launch_id) || STRCMP (mcid, alt) || STRCMP (item->app_id, btn->app_id))
         {
             g_free (alt);
             g_free (mcid);
