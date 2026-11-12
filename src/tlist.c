@@ -692,14 +692,16 @@ static void set_icon (WinlistPlugin *wl, WindowBtn *item)
 static void destroy_button (gpointer data)
 {
     WindowBtn *item = (WindowBtn *) data;
-    if (item->app_id) g_free (item->app_id);
-    if (item->launch_id) g_free (item->launch_id);
+    g_free (item->app_id);
+    g_free (item->launch_id);
+    g_free (item->tooltip);
     if (item->icon) gtk_widget_destroy (item->icon);
     if (item->btn) gtk_widget_destroy (item->btn);
     if (item->gesture) g_object_unref (item->gesture);
     if (item->dgesture) g_object_unref (item->dgesture);
     item->app_id = NULL;
     item->launch_id = NULL;
+    item->tooltip = NULL;
     item->icon = NULL;
     item->btn = NULL;
     item->gesture = NULL;
@@ -977,7 +979,7 @@ static void theme_changed (GtkWidget *, gpointer userdata)
     WinlistPlugin *wl = (WinlistPlugin *) userdata;
     GList *list;
 
-    // loop throuhg all buttons, reloading icons - rebuilding the buttons causes order to change
+    // loop through all buttons, reloading icons - rebuilding the buttons causes order to change
     list = wl->buttons;
     while (list)
     {
