@@ -1,3 +1,9 @@
+wfplug-wlist (0.13) trixie; urgency=medium
+
+  * Fix issue with applications launched not changing when alternatives change
+
+ -- Simon Long <simon@raspberrypi.com>  Thu, 12 Nov 2026 14:29:16 +0000
+
 wfplug-wlist (0.12) trixie; urgency=medium
 
   * Fix buttons re-ordering when icon theme updates
